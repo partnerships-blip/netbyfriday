@@ -190,11 +190,27 @@ See §2.
   - Model output varies, so rerun the evaluation after any prompt or model change.
 - **Tests:** 40 unit tests; the end-to-end suite now covers Confirm and the draft editor.
 
-### M4 — Public site + waitlist (4–5 days)
-- `/`, `/pricing`, `/waitlist`, `/privacy`, `/terms`, rebuilt from `NETBYFRIDAY Website.dc.html`.
-- Prices come from `lib/billing/plans.ts` and are labeled "Illustrative".
-- The website's Advisor demo is a static, pre-written sample (no public AI endpoint).
-- Waitlist with consent, duplicate handling and a honeypot field. Admin: one-click invite code per waitlist entry, sent by the founder from their own email.
+### M4 — Public site + waitlist ✅ (November 4, 2026; domain pending)
+- **Public pages:**
+  - `/` is rebuilt from `NETBYFRIDAY Website.dc.html`: hero with a working product preview, terms ticker, problem cards, six feature cards with live mini-interfaces, How it works, interactive NET45 timeline, business intelligence, Advisor sample, pricing, FAQ, final call to action and footer.
+  - Also `/pricing`, `/waitlist`, `/privacy` and `/terms`.
+  - Signed-in visitors see "Open your workspace" in the nav.
+- **No hand-typed figures.** Every number on the site comes from `lib/marketing/sample.ts`, which runs the real engine on the fictional Poca demo data. The Advisor section shows pre-written sample answers built the same way; there is no public AI endpoint.
+- **Plans** come from `lib/billing/plans.ts` and are always shown with "Illustrative plans · pricing is not final". Every call to action goes to the waitlist.
+- **Privacy and terms** are plain-language drafts that describe what the beta actually does. They are clearly marked for legal review, with bracketed items to confirm.
+- **Migration `20261106000001_waitlist.sql`:**
+  - The `waitlist` table, with no direct access for anyone.
+  - `join_waitlist()` (consent required, duplicates matched case-insensitively), and the admin-only `admin_waitlist()` and `admin_invite_waitlist()` (single-use code, 30 days).
+  - 9 pgTAP cases in `supabase/tests/database/waitlist.test.sql`.
+- **Waitlist form:** server validation, honeypot field and a minimum fill time.
+- **Admin → Waitlist:**
+  - "Invite" creates the code and opens a ready-to-send invite email in the founder's own email app; netbyfriday sends nothing.
+  - The sign-up page links to the waitlist.
+- **E2E (`tests/e2e/site.spec.ts`):**
+  - The home page's figures match the engine; hero tabs, the NET45 timeline and the Advisor sample work; the pricing label is present.
+  - Waitlist join and duplicate handling.
+  - Locally: the admin invite flow, checking the code works exactly once.
+- **Domain:** `docs/DOMAIN_SETUP.md` (GoDaddy DNS → Vercel). Waiting on the founder.
 
 ### M5 — Paid beta billing (3–4 days, only when the paid beta starts)
 - Stripe Checkout, Customer Portal, and one webhook (signature-verified, idempotent).

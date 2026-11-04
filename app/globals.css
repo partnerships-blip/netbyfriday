@@ -15,3 +15,9 @@ a { color: inherit; }
 .animate-pulse-dot { animation: ci-pulse 1s ease-in-out infinite; }
 .stripes { background: repeating-linear-gradient(135deg, #FAF7F3 0 8px, #EAE5F7 8px 9px); }
 :root { --font-head: 'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, sans-serif; }
+@keyframes nbf-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.nbf-marquee { animation: nbf-marquee 38s linear infinite; }
+.nbf-hl { font-style: italic; background: #DFFF43; border-radius: .22em; padding: 0 .14em; white-space: nowrap; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+.nbf-reveal { opacity: 0; transform: translateY(18px); transition: opacity .7s ease, transform .7s ease; }
+.nbf-reveal.nbf-in { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) { .nbf-marquee { animation: none; } .nbf-reveal { opacity: 1; transform: none; transition: none; } }

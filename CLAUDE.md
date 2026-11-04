@@ -30,8 +30,9 @@ You're building NETBYFRIDAY 1.0: a structured business workspace where creators 
 - If something needs a credential you don't have, finish the code, write the setup step in `docs/`, and move on to independent work.
 
 ## Where things stand
-Milestones 1–3 are complete; staging is https://netbyfriday-x566.vercel.app.
+Milestones 1–4 are complete; staging is https://netbyfriday-x566.vercel.app (domain setup: `docs/DOMAIN_SETUP.md`).
 - Use `components/RecordView.tsx` for any record list (Table / Board / Calendar) and `components/TaskList.tsx` for linked tasks.
 - Advisor changes: keep `verifyReply` the single gate for facts, drafts and actions.
 - After any Advisor prompt or model change, run the "Advisor evaluation" GitHub workflow against staging. It must keep 0 wrong-verified and at least 18/20.
-- Next is M4: public site and waitlist (`docs/MVP_PLAN.md` §6).
+- Public site figures come only from `lib/marketing/sample.ts` (engine + demo fixture). Never hand-type numbers on the site.
+- Next is M5 (Stripe), only when the founder starts the paid beta; otherwise M6 launch prep (`docs/MVP_PLAN.md` §6).

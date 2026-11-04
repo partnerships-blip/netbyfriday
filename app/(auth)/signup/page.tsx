@@ -22,7 +22,7 @@ export default function SignUpPage() {
           <Submit />
         </form>
       )}
-      <p className="text-sm text-muted">Already have an account? <Link href="/login" className="text-ink underline underline-offset-2">Sign in</Link></p>
+      <p className="text-sm text-muted">Already have an account? <Link href="/login" className="text-ink underline underline-offset-2">Sign in</Link> · No invite yet? <Link href="/waitlist" className="text-ink underline underline-offset-2">Join the waitlist</Link></p>
     </AuthFrame>
   );
 }

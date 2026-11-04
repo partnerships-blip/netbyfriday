@@ -26,3 +26,13 @@ export async function setFeedbackStatus(id: string, status: string): Promise<Act
     return { ok: true };
   } catch (e) { return { ok: false, error: friendlyError(e) }; }
 }
+
+export async function inviteFromWaitlist(id: string): Promise<ActionResult & { code?: string }> {
+  try {
+    z.string().uuid().parse(id);
+    const { data, error } = await createClient().rpc('admin_invite_waitlist', { p_id: id });
+    if (error) throw error;
+    revalidatePath('/admin');
+    return { ok: true, id: String(data), code: String(data), message: `Invite code ${data} created` };
+  } catch (e) { return { ok: false, error: friendlyError(e) }; }
+}
