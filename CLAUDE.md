@@ -30,4 +30,4 @@ You're building NETBYFRIDAY 1.0: a structured business workspace where creators 
 - If something needs a credential you don't have, finish the code, write the setup step in `docs/`, and move on to independent work.
 
 ## Where things stand
-Milestone 1 is complete except the staging deploy and a `npm run db:test` run on a machine with Docker; see `docs/MVP_PLAN.md` §2. Next is M2: workspace databases (contacts, tasks, `<RecordView>`).
+Milestone 1 is complete and deployed to staging (https://netbyfriday-x566.vercel.app). Only a `npm run db:test` run on a machine with Docker is outstanding; see `docs/MVP_PLAN.md` §2. Next is M2: workspace databases (contacts, tasks, `<RecordView>`).

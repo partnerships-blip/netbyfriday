@@ -56,10 +56,9 @@ Supersedes the Lean MVP Plan (v2, November 4, 2026). Same codebase, same design,
 
 It does not test the quality of the real model's answers. Run `E2E_REAL_AI=1 npm run test:e2e` with a real key to check the live model; this is part of M3.
 
-**Remaining for Milestone 1 (needs the founder)**
-1. Create the Supabase **staging** project and the Vercel project, and add the AI key (see §7).
-2. `supabase link` → `supabase db push`. Deploy to Vercel. Run `E2E_BASE_URL=https://<staging> npm run test:e2e`.
-3. Run `npm run db:test` (pgTAP privacy-rule tests) with `supabase start` on a machine with Docker. The build environment here could not pull Supabase's Docker images, so these tests have not been run yet. Tenant isolation was verified through the app and the e2e test instead.
+**Staging (done November 4):** GitHub Actions applies migrations to staging on every push that touches `supabase/` ("Staging database"). The live e2e suite runs from "Staging end-to-end" (manual, with the site URL). It passed 3/3 with the real AI provider.
+
+**Still open for Milestone 1:** Run `npm run db:test` (pgTAP privacy-rule tests) with `supabase start` on a machine with Docker. The build environment here could not pull Supabase's Docker images, so these tests have not been run yet. Tenant isolation was verified through the app and the e2e test instead.
 
 ---
 
@@ -146,7 +145,8 @@ Billing tables (`subscriptions`, `billing_events`) are added in M5, only when th
 
 Each milestone ends with every test passing, a Vercel preview deploy, and a short report: what changed, migrations, test results, and what is needed from the founder.
 
-### M1 — Build green + first end-to-end workflow ✅ (staging deploy pending)
+### M1 — Build green + first end-to-end workflow ✅
+Deployed to staging (https://netbyfriday-x566.vercel.app, Supabase project `npyxfczyoykonpomnsqt`) on November 4, 2026. The milestone e2e suite passed there with the real AI provider (GitHub Actions, "Staging end-to-end").
 See §2.
 
 ### M2 — Workspace databases (5–7 days)
@@ -185,7 +185,7 @@ See §2.
 
 ## 7. Credentials needed, in order
 
-1. **Now (finish M1):** GitHub private repo; Supabase staging project (URL + anon key); Vercel project; one AI provider key and model name, with a spend cap set in the provider's console.
+1. **M1 (done):** GitHub repo, Supabase staging project, Vercel project, AI key with spend cap.
 2. **M4:** DNS access for the domain.
 3. **M5:** Stripe account (test keys first; live keys after business verification).
 4. **M6:** Supabase production project; an SMTP sender for auth email.
