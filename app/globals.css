@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body { background: #FAF7F3; color: #32152F; -webkit-font-smoothing: antialiased; }
+.font-head { font-weight: var(--hfw, 400); letter-spacing: var(--hls, -0.01em); }
+.tnum { font-variant-numeric: tabular-nums; }
+.text-pretty { text-wrap: pretty; }
+.text-balance { text-wrap: balance; }
+a { color: inherit; }
+:focus-visible { outline: 2px solid #32152F; outline-offset: 2px; }
+@keyframes ci-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes ci-pulse { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+.animate-in { animation: ci-in .25s ease; }
+.animate-pulse-dot { animation: ci-pulse 1s ease-in-out infinite; }
+.stripes { background: repeating-linear-gradient(135deg, #FAF7F3 0 8px, #EAE5F7 8px 9px); }
+:root { --font-head: 'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, sans-serif; }

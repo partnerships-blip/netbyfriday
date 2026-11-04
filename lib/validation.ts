@@ -1,0 +1,63 @@
+import { z } from 'zod';
+import { parseMoneyToCents, STAGES } from './finance/core.js';
+
+const STAGE_KEYS = STAGES.map(s => s[0]) as [string, ...string[]];
+export const STREAM_KEYS = ['brand', 'affiliate', 'events', 'digital', 'appearances', 'other'] as const;
+export const DELIVERABLE_KEYS = ['not_started', 'in_progress', 'in_review', 'approved', 'posted', 'scheduled'] as const;
+export const OPP_STATUS = ['new', 'saved', 'pitched', 'dismissed'] as const;
+
+const text = (max: number) => z.string().trim().max(max, `Keep this under ${max} characters.`);
+const req = (label: string, max = 160) => z.string().trim().min(1, `${label} is required.`).max(max);
+export const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a valid date.').refine(s => !Number.isNaN(Date.parse(s + 'T00:00:00Z')), 'Use a valid date.');
+export const uuid = z.string().uuid();
+/** Money from a text field → integer cents. Rejects negatives and malformed input. */
+export const money = (label: string, { positive = false } = {}) =>
+  z.union([z.string(), z.number()]).transform((v, ctx) => {
+    const c = parseMoneyToCents(v);
+    if (c === null) { ctx.addIssue({ code: 'custom', message: `${label} must be an amount like 1250 or 1,250.00.` }); return z.NEVER; }
+    if (positive && c <= 0) { ctx.addIssue({ code: 'custom', message: `${label} must be more than $0.` }); return z.NEVER; }
+    return c;
+  });
+const optionalMoney = (label: string) => z.union([z.literal(''), z.undefined(), z.string(), z.number()]).transform((v, ctx) => {
+  if (v === '' || v === undefined) return 0;
+  const c = parseMoneyToCents(v);
+  if (c === null) { ctx.addIssue({ code: 'custom', message: `${label} must be an amount like 1250.` }); return z.NEVER; }
+  return c;
+});
+const email = z.union([z.literal(''), z.string().trim().email('Use a valid email address.').max(254)]);
+
+export const DealSchema = z.object({
+  brand: req('Brand', 120), campaign: text(200).default(''), agency: text(120).default(''), contactName: text(120).default(''), contactEmail: email.default(''),
+  description: text(5000).default(''), fee: optionalMoney('Fee'), feeIsEstimate: z.coerce.boolean().default(false), stage: z.enum(STAGE_KEYS).default('lead'),
+  platforms: z.array(text(40)).max(10).default([]), contentCategory: text(80).default(''), contractStatus: text(200).default(''), usageRights: text(500).default(''),
+  exclusivity: text(500).default(''), paymentTerms: text(200).default(''), notes: text(10000).default(''),
+  startedOn: isoDate.optional(), lastContactOn: isoDate.optional()
+});
+export const DealPatchSchema = DealSchema.partial().extend({ id: uuid });
+export const MoveDealSchema = z.object({ id: uuid, stage: z.enum(STAGE_KEYS) });
+
+export const DeliverableSchema = z.object({ dealId: uuid, name: req('Deliverable', 200), dueOn: isoDate, status: z.enum(DELIVERABLE_KEYS).default('not_started'), notes: text(2000).default('') });
+export const DeliverablePatchSchema = z.object({ id: uuid, name: req('Deliverable', 200).optional(), dueOn: isoDate.optional(), status: z.enum(DELIVERABLE_KEYS).optional(), notes: text(2000).optional() });
+
+export const InvoiceSchema = z.object({
+  clientName: req('Client'), description: text(2000).default(''), amount: money('Amount', { positive: true }), stream: z.enum(STREAM_KEYS).default('brand'),
+  issuedOn: isoDate, dueOn: isoDate, terms: text(60).default('Net 30'), dealId: z.union([uuid, z.literal('')]).default('')
+}).refine(v => v.dueOn >= v.issuedOn, { message: 'Due date must be on or after the issue date.', path: ['dueOn'] });
+export const PaymentSchema = z.object({ invoiceId: uuid, amount: money('Amount', { positive: true }), receivedOn: isoDate, note: text(500).default('') });
+export const IncomeSchema = z.object({ stream: z.enum(STREAM_KEYS), amount: money('Amount', { positive: true }), receivedOn: isoDate, counterparty: text(160).default(''), description: text(500).default('') });
+export const ExpenseSchema = z.object({ category: req('Category', 120), amount: money('Amount', { positive: true }), spentOn: isoDate, note: text(500).default('') });
+export const GoalsSchema = z.object({ monthly: optionalMoney('Monthly goal'), annual: optionalMoney('Annual goal') });
+export const OpportunitySchema = z.object({ name: req('Name'), category: req('Category', 80), location: text(120).default(''), fit: text(2000).default(''), source: text(300).default('Added by you'), angle: text(2000).default('') });
+export const OppStatusSchema = z.object({ id: uuid, status: z.enum(OPP_STATUS) });
+export const SnapshotSchema = z.object({ platform: req('Platform', 40), followers: z.coerce.number().int().min(0).max(1e9), engagementRate: z.union([z.literal(''), z.coerce.number().min(0).max(100)]).default(''), avgViews: z.union([z.literal(''), z.coerce.number().int().min(0)]).default(''), capturedOn: isoDate });
+export const CategorySchema = z.object({ name: req('Category', 80), avgViews: z.coerce.number().int().min(0), posts: z.coerce.number().int().min(0).default(0) });
+export const ProfileSchema = z.object({
+  displayName: text(120), businessName: text(120), niche: text(80), location: text(120), platforms: z.array(text(40)).max(12), followerRange: text(40),
+  revenueStreams: z.array(text(40)).max(10), hasManager: z.boolean(), businessStructure: text(60), priority: text(80)
+}).partial();
+export const BrandSchema = z.object({ name: req('Product name', 60).optional(), accent: z.enum(['cobalt', 'lime', 'ink', 'clay']).optional(), headlineFont: z.enum(['serif', 'sans']).optional() });
+export const PrefsSchema = z.object({ dailyBriefing: z.boolean(), emailDigest: z.boolean(), pushAlerts: z.boolean(), analyticsOptIn: z.boolean() }).partial();
+export const FeedbackSchema = z.object({ kind: z.enum(['feedback', 'bug']), message: req('Message', 5000), page: text(200).default(''), contactOk: z.boolean().default(false) });
+export const SignUpSchema = z.object({ email: z.string().trim().toLowerCase().email('Use a valid email address.'), password: z.string().min(10, 'Use at least 10 characters.').max(128), inviteCode: z.string().trim().toUpperCase().regex(/^[A-Z0-9-]{6,32}$/, 'Enter the invite code from your invitation.') });
+export const SignInSchema = z.object({ email: z.string().trim().toLowerCase().email(), password: z.string().min(1).max(128) });
+export const CsvDealRowSchema = z.object({ brand: req('brand', 120), campaign: text(200).default(''), fee: optionalMoney('fee'), stage: z.enum(STAGE_KEYS).default('paid'), date: isoDate.optional() });
