@@ -165,13 +165,30 @@ See §2.
 - E2E: add a contact; link it from the Table view; add a task from the partnership; check the task appears in the Tasks table, calendar and board, on the contact, and on the dashboard; check the deliverable appears on Content; check the invoice calendar and terms panel; check another creator's export has no contacts or tasks.
 - **Moved to M3:** the Poca demo fixture, so it is built together with the Advisor evaluation set that uses it.
 
-### M3 — Advisor as the daily operator (4–5 days)
-- Swap the demo fixture for the Poca sample data (`design-reference/nbf-data.js`), with contacts and tasks. It is read-only and never seeded into production, and it is the basis for the evaluation set below.
-- Add contacts, tasks and per-brand history to the Advisor's context, with references.
-- Add "What's on my plate this week?" and "Who should I follow up with?" as built-in prompts with deterministic data behind them.
-- Drafts in the Advisor (pitch, follow-up, payment reminder), using the existing `/api/drafts`. Editable, with Copy and Open in email buttons. Never sent by NETBYFRIDAY.
-- Proposed actions with explicit **Confirm** (create a task, update a deliverable status). Financial records are excluded.
-- An **evaluation set**: 20 questions against the Poca fixture with expected numbers. Run it with the real model (`E2E_REAL_AI=1`) and record the verified-fact rate. Ship only when no wrong number is ever marked Verified.
+### M3 — Advisor as the daily operator ✅ (November 4, 2026)
+- **Demo workspace:** "Poca Monroe", built from `design-reference/nbf-data.js` (`lib/demo/fixture.ts`), with contacts and tasks. Read-only and never written to the database. A unit test checks it is internally consistent.
+- **Engine:**
+  - `agenda` (this week): tasks, deliverables and invoices due in the next 7 days, plus anything overdue.
+  - `followUps`: overdue invoices, unanswered inquiries, unanswered pitches, quiet negotiations, and contacts with follow-up dates.
+  - Both are deterministic and each item cites a record.
+- **Advisor context:** contacts, open tasks, per-brand history (received and unpaid, on the same basis as the Brands screen), `thisWeek` and `followUps`, all with record references.
+- **Built-in prompts:** "What's on my plate this week?" and "Who should I follow up with?".
+- **Drafts:** at most 2 per answer, for a payment follow-up, contract request, pitch follow-up, reconnect note or new campaign.
+  - Each must point at a real partnership, invoice or contact.
+  - They open in the existing draft editor (edit, Copy, open in your own email app).
+  - The recipient address comes from the creator's records, never from the model. Nothing is sent.
+- **Proposed changes:** only `create_task` and `set_deliverable_status`, at most 3 per answer.
+  - They must use real record references and valid values. They run through the normal server actions only after **Confirm**.
+  - Answers reloaded from history show "Suggested earlier" with no Confirm button, so nothing can be applied twice.
+  - Invoices, payments, income, expenses, fees and stages can never be changed this way; the verifier drops any such proposal.
+- **Reliability:** the provider reports why an answer stopped. The output cap was raised to 3,000 tokens. An answer cut off at the cap is reported as "ran too long" instead of a generic error.
+- **Evaluation:** 20 questions on the demo workspace (`tests/eval`, "Advisor evaluation" workflow), with expected numbers calculated by the engine.
+  - Hard rules: no wrong number marked Verified, no unreadable answers, no disallowed actions.
+  - Staging, real model:
+    - first run: 17/20 (3 answers cut off by the length cap)
+    - after the fix: **20/20**, 0 wrong-verified, 97% of facts verified
+  - Model output varies, so rerun the evaluation after any prompt or model change.
+- **Tests:** 40 unit tests; the end-to-end suite now covers Confirm and the draft editor.
 
 ### M4 — Public site + waitlist (4–5 days)
 - `/`, `/pricing`, `/waitlist`, `/privacy`, `/terms`, rebuilt from `NETBYFRIDAY Website.dc.html`.
