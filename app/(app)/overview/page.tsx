@@ -8,6 +8,7 @@ import { RevenueChart } from '@/components/overview/RevenueChart';
 import { Briefing } from '@/components/overview/Briefing';
 import { InsightList } from '@/components/InsightList';
 import { EmptyStart } from '@/components/overview/EmptyStart';
+import { TaskList } from '@/components/TaskList';
 
 export default async function OverviewPage() {
   const app = await loadApp();
@@ -15,6 +16,11 @@ export default async function OverviewPage() {
   const first = (app.profile.displayName || '').split(' ')[0];
   const hr = Number(new Intl.DateTimeFormat('en-US', { hour: 'numeric', hour12: false, timeZone: app.ws.timezone }).format(new Date()));
   const delta = m.prevMonthCents > 0 ? Math.round((m.thisMonthCents - m.prevMonthCents) / m.prevMonthCents * 100) : null;
+  const tasks = app.input.tasks ?? [];
+  const dealLabel = new Map(app.input.deals.map(d => [d.id, `${d.brandName}${d.campaign ? ' – ' + d.campaign : ''}`]));
+  const contactLabel = new Map((app.input.contacts ?? []).map(c => [c.id, c.name]));
+  const taskLabels = Object.fromEntries(tasks.map(t => [t.id, [t.dealId && dealLabel.get(t.dealId), t.contactId && contactLabel.get(t.contactId)].filter(Boolean).join(' · ')]));
+  const maxWeek = Math.max(1, ...m.expectedWeeks.map((w: any) => w.cents));
   const empty = !app.input.deals.length && !m.ledger.length && !app.input.invoices.length;
   const cards = [
     { label: 'Revenue this month', value: formatCents(m.thisMonthCents), sub: delta === null ? 'Money received this month. Not enough history to compare.' : `${delta >= 0 ? '+' : ''}${delta}% vs ${monthLabel(m.months[10])} (${formatCents(m.prevMonthCents)}) · received to date`, href: '/money', danger: false },
@@ -60,6 +66,19 @@ export default async function OverviewPage() {
           })}
           {!m.nextDeliverables.length && <p className="text-sm text-muted">No deliverables scheduled.</p>}
         </Card>
+      </div>
+      <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
+        <Card className="flex flex-col gap-2 px-5 pb-4 pt-5">
+          <div className="flex items-baseline justify-between pb-1"><h2 className="font-head text-[26px]">Tasks</h2>
+            <span className="text-[13px] text-sub">{m.overdueTasks.length ? <span className="text-danger">{m.overdueTasks.length} overdue · </span> : null}{m.weekTasks.length} due this week</span></div>
+          <TaskList tasks={m.upcomingTasks} labels={taskLabels} today={m.today} readOnly={app.readOnly} limit={6} empty="Nothing on your list. Add tasks from a partnership, a contact, or the Tasks page." />
+        </Card>
+        <Link href="/money" className="flex flex-col gap-3 rounded-card border border-line bg-white p-5 transition hover:border-[#9A8396]">
+          <div className="flex items-baseline justify-between gap-2"><Eyebrow>Expected cash · next 8 weeks</Eyebrow><span className="font-head tnum text-[22px]">{formatCents(m.expected8wCents)}</span></div>
+          <div className="flex h-[84px] items-end gap-1.5" aria-hidden>{m.expectedWeeks.map((w: any, i: number) =>
+            <div key={w.start} className={`flex-1 rounded-t ${i === 0 ? 'bg-chartreuse' : 'bg-plum'}`} style={{ height: `${Math.max(w.cents ? 6 : 2, w.cents / maxWeek * 100)}%`, opacity: w.cents ? 1 : 0.15 }} />)}</div>
+          <span className="text-xs leading-relaxed text-muted">From unpaid invoices by due date. Expected, not guaranteed{m.overdueCents ? `; ${formatCents(m.overdueCents)} overdue not included` : ''}.</span>
+        </Link>
       </div>
     </>
   );

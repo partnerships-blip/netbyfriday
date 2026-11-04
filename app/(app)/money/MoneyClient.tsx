@@ -1,4 +1,5 @@
 'use client';
+import { RecordView } from '@/components/RecordView';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Btn, Card, Eyebrow, Pill, Bar, EVIDENCE, cx } from '@/components/ui';
@@ -7,7 +8,7 @@ import { DraftModal, type DraftTarget } from '@/components/DraftModal';
 import { invoiceFields, paymentFields, incomeFields, expenseFields, goalFields } from '@/components/forms';
 import { useAction, toast } from '@/components/Toaster';
 import { createInvoice, recordPayment, deletePayment, voidInvoice, addIncome, deleteIncome, addExpense, deleteExpense, saveGoals } from '@/app/(app)/actions';
-import { formatCents, formatCentsExact, shortDate, monthLabel, dayNumber } from '@/lib/finance/core.js';
+import { formatCents, formatCentsExact, shortDate, monthLabel, dayNumber, addDays, termsDays } from '@/lib/finance/core.js';
 import { STREAM_COLOR, STREAM_LABEL } from '@/lib/brand';
 
 const STATE: Record<string, { label: string; tone: any }> = { paid: { label: 'Paid', tone: 'ok' }, overdue: { label: 'Overdue', tone: 'danger' }, partial: { label: 'Partially paid', tone: 'warn' }, awaiting: { label: 'Awaiting payment', tone: 'neutral' } };
@@ -15,7 +16,7 @@ type Modal = null | { kind: 'invoice' } | { kind: 'pay'; id: string; balance: nu
 
 export function MoneyClient({ m, deals, income, expenses, readOnly, today }: { m: any; deals: { id: string; label: string; email: string; brand: string }[]; income: any[]; expenses: any[]; readOnly: boolean; today: string; profile: any; brandName: string }) {
   const router = useRouter();
-  const [tab, setTab] = useState<'Open' | 'Overdue' | 'Paid' | 'All'>('Open');
+  const [tab, setTab] = useState<'Open' | 'Overdue' | 'Paid' | 'All' | 'Calendar'>('Open');
   const [modal, setModal] = useState<Modal>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [draft, setDraft] = useState<DraftTarget | null>(null);
@@ -25,7 +26,7 @@ export function MoneyClient({ m, deals, income, expenses, readOnly, today }: { m
   const wrap = (fn: (v: any) => Promise<any>) => async (v: any) => { const r = await fn(v); if (r.ok) refresh(); return r; };
 
   const F: Record<string, (v: any) => boolean> = { Open: v => v.balanceCents > 0, Overdue: v => v.daysLate > 0, Paid: v => v.balanceCents === 0, All: () => true };
-  const rows = m.invoices.filter(F[tab]).sort((a: any, b: any) => (a.dueOn < b.dueOn ? -1 : 1));
+  const rows = tab === 'Calendar' ? [] : m.invoices.filter(F[tab]).sort((a: any, b: any) => (a.dueOn < b.dueOn ? -1 : 1));
   const dim = new Date(Date.UTC(+today.slice(0, 4), +today.slice(5, 7), 0)).getUTCDate();
   const stats = [
     ['Revenue received', formatCents(m.trailing12Cents), 'Payments + direct income, last 12 months', ''],
@@ -59,10 +60,14 @@ export function MoneyClient({ m, deals, income, expenses, readOnly, today }: { m
       <Card className="flex flex-col gap-3 px-5 py-[18px]">
         <div className="flex flex-wrap items-center gap-2.5">
           <h2 className="mr-auto font-head text-[26px]">Invoices</h2>
-          <div className="flex gap-1 rounded-[10px] bg-bg p-[3px]" role="tablist">{(['Open', 'Overdue', 'Paid', 'All'] as const).map(t => <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={cx('h-[30px] rounded-lg px-3 text-[13px]', tab === t ? 'bg-white font-semibold' : '')}>{t}</button>)}</div>
+          <div className="flex gap-1 rounded-[10px] bg-bg p-[3px]" role="tablist">{(['Open', 'Overdue', 'Paid', 'All', 'Calendar'] as const).map(t => <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={cx('h-[30px] rounded-lg px-3 text-[13px]', tab === t ? 'bg-white font-semibold' : '')}>{t}</button>)}</div>
           {!readOnly && <Btn variant="primary" onClick={() => setModal({ kind: 'invoice' })}>New invoice</Btn>}
         </div>
-        <div className="hidden grid-cols-[88px_minmax(0,1.4fr)_100px_100px_150px_minmax(0,1.6fr)] gap-3 border-b border-line py-2 font-mono text-[10px] uppercase tracking-[.08em] text-muted md:grid"><span>Invoice</span><span>Client</span><span>Amount</span><span>Balance</span><span>Status</span><span className="text-right">Actions</span></div>
+        {tab === 'Calendar' && <RecordView<any> storageKey="invoices-calendar" rows={m.invoices} getId={v => v.id} today={today} views={['calendar']} columns={[]} noun="invoice"
+          onOpen={v => { setTab(v.balanceCents ? (v.daysLate ? 'Overdue' : 'Open') : 'Paid'); setExpanded(v.id); }}
+          calendar={{ dateOf: v => v.dueOn, label: v => `${v.number} · ${v.clientName} · ${v.balanceCents ? formatCents(v.balanceCents) + ' due' : 'paid'}`, tone: v => v.balanceCents === 0 ? 'done' : v.daysLate ? 'late' : 'normal' }}
+          empty={<p className="py-3 text-sm text-muted">No invoices yet.</p>} />}
+        <div className={cx('hidden grid-cols-[88px_minmax(0,1.4fr)_100px_100px_150px_minmax(0,1.6fr)] gap-3 border-b border-line py-2 font-mono text-[10px] uppercase tracking-[.08em] text-muted', tab !== 'Calendar' && 'md:grid')}><span>Invoice</span><span>Client</span><span>Amount</span><span>Balance</span><span>Status</span><span className="text-right">Actions</span></div>
         {rows.map((v: any) => (
           <div key={v.id} className="border-b border-soft2">
             <div className="grid grid-cols-2 items-center gap-3 py-3 text-sm md:grid-cols-[88px_minmax(0,1.4fr)_100px_100px_150px_minmax(0,1.6fr)]">
@@ -86,8 +91,35 @@ export function MoneyClient({ m, deals, income, expenses, readOnly, today }: { m
             </div>}
           </div>
         ))}
-        {!rows.length && <p className="py-3 text-sm text-muted">No invoices in this view.</p>}
+        {!rows.length && tab !== 'Calendar' && <p className="py-3 text-sm text-muted">No invoices in this view.</p>}
       </Card>
+
+      <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+        <Card className="flex flex-col gap-3 px-5 py-[18px]">
+          <div className="flex flex-wrap items-baseline justify-between gap-2"><Eyebrow>Expected cash · next 8 weeks</Eyebrow><span className="tnum text-sm font-semibold">{formatCents(m.expected8wCents)}</span></div>
+          <div className="flex h-[150px] items-end gap-2" role="img" aria-label={`Expected from unpaid invoices over the next 8 weeks: ${formatCents(m.expected8wCents)}`}>
+            {m.expectedWeeks.map((w: any, i: number) => { const max = Math.max(1, ...m.expectedWeeks.map((x: any) => x.cents)); return (
+              <div key={w.start} className="flex h-full flex-1 flex-col items-center justify-end gap-1" title={`${shortDate(w.start)}–${shortDate(w.end)}: ${formatCents(w.cents)}`}>
+                {w.cents > 0 && <span className="tnum text-[10px] text-sub">{formatCents(w.cents)}</span>}
+                <div className={cx('w-full rounded-t-md transition-[height] duration-300', i === 0 ? 'bg-chartreuse' : 'bg-plum')} style={{ height: `${Math.max(w.cents ? 4 : 1, w.cents / max * 100)}%`, opacity: w.cents ? 1 : 0.15 }} />
+                <span className="font-mono text-[10px] text-muted">{i === 0 ? 'This wk' : shortDate(w.start)}</span>
+              </div>); })}
+          </div>
+          <p className="text-xs leading-relaxed text-muted">Unpaid invoice balances by due date. Expected, not received, and not guaranteed. {m.overdueCents ? `${formatCents(m.overdueCents)} overdue is not included. ` : ''}{m.expectedLaterCents ? `${formatCents(m.expectedLaterCents)} is due after 8 weeks.` : ''}</p>
+        </Card>
+        <Card className="flex flex-col gap-2.5 px-5 py-[18px]">
+          <Eyebrow>Payment terms</Eyebrow>
+          {m.termsStats.map((t: any) => (
+            <div key={t.terms} className="flex items-center gap-3 border-t border-soft2 pt-2.5 first:border-0 first:pt-0">
+              <span className="w-[86px] flex-none rounded-full bg-[#F3FFC4] px-2 py-0.5 text-center text-[11px] font-bold">{t.terms}</span>
+              <span className="flex min-w-0 flex-1 flex-col text-[13px]"><span className="tnum">{t.openCount} open · {formatCents(t.openCents)}</span>
+                <span className={cx('text-xs', t.overdueCount ? 'text-danger' : 'text-muted')}>{t.overdueCount ? `${t.overdueCount} overdue · ${formatCents(t.overdueCents)}` : 'Nothing overdue'}</span></span>
+              <span className="text-right text-xs text-sub"><span className="tnum block text-sm font-semibold text-ink">{t.avgDaysToPay === null ? '—' : `${t.avgDaysToPay}d`}</span>avg to pay{t.paidCount ? ` (${t.paidCount})` : ''}</span>
+            </div>))}
+          {!m.termsStats.length && <p className="text-sm text-muted">Terms appear once you create invoices.</p>}
+          <p className="text-xs leading-relaxed text-muted">Average days from issue date to final payment, across fully paid invoices. Small samples are a direction, not a rule.</p>
+        </Card>
+      </div>
 
       <div className="grid items-start gap-3 md:grid-cols-2 xl:grid-cols-3">
         <Card className="flex flex-col gap-3 px-5 py-[18px]">
@@ -118,7 +150,7 @@ export function MoneyClient({ m, deals, income, expenses, readOnly, today }: { m
       {m.insights.length > 0 && <div className="flex flex-col gap-2.5"><Eyebrow>Financial insights</Eyebrow>
         <div className="grid gap-2.5 md:grid-cols-3">{m.insights.map((i: any) => <Card key={i.id} className="flex flex-col gap-2 p-4"><Pill tone={EVIDENCE[i.evidence].tone} className="w-fit">{EVIDENCE[i.evidence].label}</Pill><div className="text-[15px] font-medium leading-snug">{i.title}</div><div className="text-[13px] leading-relaxed text-sub">{i.action}</div></Card>)}</div></div>}
 
-      <FormModal open={modal?.kind === 'invoice'} onClose={() => setModal(null)} title="New invoice" fields={invoiceFields(deals)} initial={{ issuedOn: today, dueOn: new Date((dayNumber(today) + 30) * 864e5).toISOString().slice(0, 10), terms: 'Net 30', stream: 'brand', dealId: '' }} submitLabel="Create invoice" action={wrap(createInvoice)} />
+      <FormModal open={modal?.kind === 'invoice'} onClose={() => setModal(null)} title="New invoice" fields={invoiceFields(deals)} initial={{ issuedOn: today, dueOn: new Date((dayNumber(today) + 30) * 864e5).toISOString().slice(0, 10), terms: 'Net 30', stream: 'brand', dealId: '' }} derive={(v, k) => { if (k !== 'terms' && k !== 'issuedOn') return null; const n = termsDays(v.terms); return n !== null && /^\d{4}-\d{2}-\d{2}$/.test(v.issuedOn || '') ? { dueOn: addDays(v.issuedOn, n) } : null; }} submitLabel="Create invoice" action={wrap(createInvoice)} />
       {modal?.kind === 'pay' && <FormModal open onClose={() => setModal(null)} title="Record a payment" note={`Balance ${formatCentsExact(modal.balance)}. Only record money you have actually received; this is what counts as revenue.`} fields={paymentFields} initial={{ amount: (modal.balance / 100).toFixed(2), receivedOn: today }} submitLabel="Record payment" action={wrap(v => recordPayment({ ...v, invoiceId: modal.id }))} />}
       <FormModal open={modal?.kind === 'income'} onClose={() => setModal(null)} title="Record income" note="Money you received without an invoice: affiliate payouts, ticket sales, product sales." fields={incomeFields} initial={{ receivedOn: today, stream: 'affiliate' }} submitLabel="Add income" action={wrap(addIncome)} />
       <FormModal open={modal?.kind === 'expense'} onClose={() => setModal(null)} title="Add expense" fields={expenseFields} initial={{ spentOn: today }} submitLabel="Add expense" action={wrap(addExpense)} />

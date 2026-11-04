@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Modal } from './Modal';
 import { Btn, Field, Input, Select, Textarea } from './ui';
 import { useAction } from './Toaster';
@@ -8,13 +8,17 @@ import type { ActionResult } from '@/lib/types';
 export type FieldSpec = { name: string; label: string; type?: 'text' | 'email' | 'date' | 'money' | 'number' | 'select' | 'area' | 'checkbox'; required?: boolean; options?: (string | { v: string; l: string })[]; placeholder?: string; full?: boolean };
 
 /** Generic form modal. Validation happens on the server (zod); errors come back as a message. */
-export function FormModal({ open, onClose, title, note, fields, initial = {}, submitLabel, action }: {
+export function FormModal({ open, onClose, title, note, fields, initial = {}, submitLabel, action, derive, onDelete, deleteLabel = 'Delete' }: {
   open: boolean; onClose: () => void; title: string; note?: string; fields: FieldSpec[]; initial?: Record<string, any>; submitLabel: string; action: (values: Record<string, any>) => Promise<ActionResult>;
+  /** Fill dependent fields as the user types (e.g. due date from payment terms). Returns fields to overwrite. */
+  derive?: (values: Record<string, any>, changed: string) => Record<string, any> | null;
+  onDelete?: () => Promise<ActionResult>; deleteLabel?: string;
 }) {
   const [values, setValues] = useState<Record<string, any>>(initial);
   const [err, setErr] = useState('');
   const [pending, run] = useAction();
-  const set = (k: string, v: any) => { setValues(s => ({ ...s, [k]: v })); setErr(''); };
+  useEffect(() => { if (open) setValues(initial); setErr(''); }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  const set = (k: string, v: any) => { setValues(s => { const n = { ...s, [k]: v }; return { ...n, ...(derive?.(n, k) ?? {}) }; }); setErr(''); };
   const submit = () => {
     const miss = fields.find(f => f.required && !String(values[f.name] ?? '').trim());
     if (miss) return setErr(`${miss.label} is required.`);
@@ -48,6 +52,7 @@ export function FormModal({ open, onClose, title, note, fields, initial = {}, su
         <div className="flex gap-2">
           <Btn variant="primary" type="submit" disabled={pending}>{pending ? 'Saving…' : submitLabel}</Btn>
           <Btn type="button" onClick={onClose}>Cancel</Btn>
+          {onDelete && <Btn type="button" variant="danger" className="ml-auto" disabled={pending} onClick={() => confirm(`${deleteLabel}?`) && run(async () => { const r = await onDelete(); if (!r.ok) setErr(r.error); return r; }, () => onClose())}>{deleteLabel}</Btn>}
         </div>
       </form>
     </Modal>

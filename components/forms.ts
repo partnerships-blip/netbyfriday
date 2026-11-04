@@ -36,3 +36,20 @@ export const oppFields: FieldSpec[] = [
   { name: 'location', label: 'Location' }, { name: 'source', label: 'Source or evidence', placeholder: 'Where did you learn about this?' },
   { name: 'fit', label: 'Why it may fit', type: 'area' }, { name: 'angle', label: 'Outreach angle', type: 'area' }
 ];
+
+type Opt = { id: string; label: string };
+const none = (l: string) => [{ v: '', l }];
+export const contactFields = (brands: string[]): FieldSpec[] => [
+  { name: 'name', label: 'Name', required: true }, { name: 'brand', label: 'Brand', placeholder: brands.length ? brands.slice(0, 2).join(', ') + '…' : 'Brand or agency' },
+  { name: 'role', label: 'Role', placeholder: 'Influencer marketing manager' }, { name: 'email', label: 'Email', type: 'email' },
+  { name: 'phone', label: 'Phone' }, { name: 'followUpOn', label: 'Follow up on', type: 'date' },
+  { name: 'lastContactedOn', label: 'Last contacted', type: 'date' }, { name: 'notes', label: 'Notes', type: 'area' }
+];
+export const taskFields = (deals: Opt[], contacts: Opt[], invoices: Opt[]): FieldSpec[] => [
+  { name: 'title', label: 'Task', required: true, full: true }, { name: 'dueOn', label: 'Due date', type: 'date' },
+  { name: 'priority', label: 'Priority', type: 'select', options: [{ v: 'normal', l: 'Normal' }, { v: 'high', l: 'High' }, { v: 'low', l: 'Low' }] },
+  { name: 'dealId', label: 'Partnership', type: 'select', options: [...none('Not linked'), ...deals.map(d => ({ v: d.id, l: d.label }))] },
+  { name: 'contactId', label: 'Contact', type: 'select', options: [...none('Not linked'), ...contacts.map(c => ({ v: c.id, l: c.label }))] },
+  { name: 'invoiceId', label: 'Invoice', type: 'select', options: [...none('Not linked'), ...invoices.map(v => ({ v: v.id, l: v.label }))] },
+  { name: 'notes', label: 'Notes', type: 'area' }
+];

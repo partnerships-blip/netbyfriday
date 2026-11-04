@@ -16,7 +16,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <Shell brandName={app.brand.name} logoUrl={app.brand.logoUrl} demo={app.demo} isAdmin={app.isAdmin} dateLabel={date}
         initials={(p.displayName || app.user.email || '?').split(/[\s@]/).filter(Boolean).map(x => x[0]).join('').slice(0, 2).toUpperCase()}
         name={p.displayName || app.user.email || ''} business={p.businessName || '—'} optedIn={app.prefs.emailDigest || app.prefs.pushAlerts}
-        badges={{ '/money': m.overdueInvoices.length, '/intelligence': m.insights.filter((i: any) => i.id !== 'empty').length }}
+        badges={{ '/money': m.overdueInvoices.length, '/tasks': m.overdueTasks.length, '/intelligence': m.insights.filter((i: any) => i.id !== 'empty').length }}
         notifications={m.notifications.map((n: any) => ({ ...n, unread: app.demo ? true : !read.has(n.key) }))}>
         {children}
       </Shell>

@@ -55,7 +55,7 @@ test.describe.serial('core creator journey', () => {
 
     await page.getByLabel('Deliverable').fill('1 Instagram Reel');                 // 4
     const due = new Date(Date.now() + 3 * 864e5).toISOString().slice(0, 10);
-    await page.getByLabel('Due date').fill(due);
+    await page.getByLabel('Due date', { exact: true }).fill(due);
     await page.getByRole('button', { name: 'Add', exact: true }).click();
     await expect(page.getByText('1 Instagram Reel')).toBeVisible();
     await page.getByRole('button', { name: 'Close' }).click();
@@ -106,6 +106,59 @@ test.describe.serial('core creator journey', () => {
     await page.reload();                                                            //     history is saved to the workspace
     await expect(page.getByText('How much have I been paid, and what is still owed?')).toBeVisible();
 
+    // ---- Milestone 2: connected records ----
+    await page.goto('/contacts');                                                   // 12: a contact at the brand
+    await page.getByRole('button', { name: 'New contact' }).click();
+    await fill(page, 'Name *', 'Dana Rivera');
+    await fill(page, 'Brand', 'Testbrand Co');
+    await fill(page, 'Email', 'dana@testbrand.example');
+    await page.getByRole('button', { name: 'Add contact' }).click();
+    await expect(page.getByRole('row', { name: /Dana Rivera/ })).toBeVisible();
+
+    await page.goto('/partnerships');                                               // 13: table view, link contact, add task
+    await page.getByRole('tab', { name: 'Table' }).click();
+    await page.getByRole('row', { name: /Testbrand Co/ }).click();
+    await page.getByLabel('Linked contact').selectOption({ label: 'Dana Rivera · Testbrand Co' });
+    await expect(page.getByRole('link', { name: /Dana Rivera/ })).toBeVisible();
+    await page.getByLabel('New task').fill('Send Q1 recap');
+    await page.getByLabel('Task due date').fill(new Date(Date.now() + 2 * 864e5).toISOString().slice(0, 10));
+    await page.getByRole('button', { name: 'Add task' }).click();
+    await expect(page.getByText('Send Q1 recap')).toBeVisible();
+    await expect(page.getByText(/Relationship with Testbrand Co/).locator('..')).toContainText('$2,000'); // received matches payment history
+    await page.getByRole('button', { name: 'Close' }).click();
+    await expect(page.getByRole('row', { name: /Testbrand Co/ })).toContainText('Dana Rivera');
+
+    await page.goto('/tasks');                                                      // 14: task appears in every view
+    await expect(page.getByRole('row', { name: /Send Q1 recap/ })).toContainText('Testbrand Co – Launch');
+    await page.getByRole('tab', { name: 'Calendar' }).click();
+    await expect(page.getByRole('button', { name: /Send Q1 recap/ })).toBeVisible();
+    await page.getByRole('tab', { name: 'Board' }).click();
+    await expect(page.getByText('Send Q1 recap')).toBeVisible();
+
+    await page.goto('/contacts');                                                   // 15: contact shows related records
+    await page.getByRole('cell', { name: 'Dana Rivera' }).click();
+    await expect(page.getByRole('link', { name: /Testbrand Co – Launch/ })).toBeVisible();
+    await expect(page.getByText('Send Q1 recap')).toBeVisible();
+    await page.getByRole('button', { name: 'Close' }).click();
+    await page.getByRole('tab', { name: /Brands/ }).click();
+    await expect(page.getByRole('row', { name: /Testbrand Co/ })).toContainText('$2,000');
+
+    await page.goto('/content');                                                    // 16: deliverables collect on Content
+    await expect(page.getByRole('row', { name: /1 Instagram Reel/ })).toBeVisible();
+
+    await page.goto('/money');                                                      // 17: terms, expected cash, invoice calendar
+    await expect(page.getByText('Expected cash · next 8 weeks')).toBeVisible();
+    await expect(page.getByText('avg to pay').first()).toBeVisible();
+    await page.getByRole('tab', { name: 'Calendar' }).click();
+    await expect(page.getByRole('button', { name: /INV-\d+ · Testbrand Co · \$3,000 due/ })).toBeVisible();
+
+    await page.goto('/overview');                                                   //     dashboard shows the task and expected cash
+    await expect(page.getByText('Send Q1 recap')).toBeVisible();
+    await expect(page.locator('a', { hasText: 'Expected cash' })).toContainText('$3,000');
+    await shot(page, '5-dashboard-m2');
+    await page.goto('/tasks'); await shot(page, '6-tasks');
+    await page.goto('/contacts'); await shot(page, '7-contacts');
+
     await page.goto('/overview');                                                   // 11
     await page.getByRole('button', { name: 'Sign out' }).first().click();
     await page.waitForURL('**/login');
@@ -130,6 +183,8 @@ test.describe.serial('core creator journey', () => {
     const body = await exp.json();
     expect(JSON.stringify(body)).not.toContain('Testbrand Co');
     expect(body.deals).toHaveLength(0);
+    expect(body.contacts).toHaveLength(0);
+    expect(body.tasks).toHaveLength(0);
     // Unauthenticated API access is refused.
     const anon = await request.post('/api/advisor', { data: { question: 'list all invoices' } });
     expect(anon.status()).toBe(401);

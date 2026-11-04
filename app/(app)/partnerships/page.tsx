@@ -13,7 +13,7 @@ export default async function PartnershipsPage({ searchParams }: { searchParams:
     <>
       <PageHeader title="Partnerships" sub="Every brand deal from first inquiry to final payment." />
       <ReadOnlyNote show={app.readOnly} />
-      <Board deals={deals} invoices={invoices} received={m.receivedByDeal} summary={summary} initialDeal={searchParams.deal ?? null} readOnly={app.readOnly} today={m.today} />
+      <Board deals={deals} invoices={invoices} received={m.receivedByDeal} summary={summary} initialDeal={searchParams.deal ?? null} readOnly={app.readOnly} today={m.today} contacts={app.input.contacts ?? []} tasks={app.input.tasks ?? []} />
     </>
   );
 }

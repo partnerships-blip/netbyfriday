@@ -11,13 +11,15 @@ import { useAction, toast } from '@/components/Toaster';
 import { addDeliverable, updateDeliverable, deleteDeliverable, updateDeal, deleteDeal } from '@/app/(app)/actions';
 import { STAGES, formatCents, shortDate } from '@/lib/finance/core.js';
 import { DELIVERABLE_LABEL } from '@/lib/brand';
-import type { Deal, Stage } from '@/lib/types';
+import type { Contact, Deal, Stage, Task } from '@/lib/types';
+import Link from 'next/link';
+import { TaskList } from '@/components/TaskList';
 import type { InvoiceLite } from './Board';
 
 const DTONE: Record<string, any> = { not_started: 'neutral', in_progress: 'accent', in_review: 'warn', approved: 'ok', posted: 'ok', scheduled: 'neutral' };
 const DRAFTS = ['Following up on an unanswered proposal', 'Requesting a contract', 'Following up on payment', 'Reconnecting with a previous partner', 'Proposing a new campaign'];
 
-export function DealDrawer({ deal, allDeals, invoices, received, onClose, onMove, readOnly, today }: { deal: Deal | null; allDeals: Deal[]; invoices: InvoiceLite[]; received: Record<string, number>; onClose: () => void; onMove: (id: string, s: Stage) => void; readOnly: boolean; today: string }) {
+export function DealDrawer({ deal, allDeals, contacts = [], tasks = [], invoices, received, onClose, onMove, readOnly, today }: { deal: Deal | null; allDeals: Deal[]; contacts?: Contact[]; tasks?: Task[]; invoices: InvoiceLite[]; received: Record<string, number>; onClose: () => void; onMove: (id: string, s: Stage) => void; readOnly: boolean; today: string }) {
   const router = useRouter();
   const [pending, run] = useAction();
   const [editing, setEditing] = useState(false);
@@ -28,9 +30,10 @@ export function DealDrawer({ deal, allDeals, invoices, received, onClose, onMove
   if (!deal) return null;
   const guard = (fn: () => void) => () => (readOnly ? toast('Demo mode is read-only.') : fn());
   const history = allDeals.filter(d => d.brandName === deal.brandName && d.stage !== 'lost').sort((a, b) => (a.startedOn < b.startedOn ? 1 : -1));
-  const histReceived = history.reduce((a, d) => a + (received[d.id] || 0), 0);
   const paidDeals = history.filter(d => (received[d.id] || 0) > 0);
   const brandInvoices = invoices.filter(v => history.some(d => d.id === v.dealId) || v.clientName.toLowerCase() === deal.brandName.toLowerCase());
+  // Same basis as Brands & Contacts: payments recorded on this brand's invoices, linked or billed to it by name.
+  const histReceived = brandInvoices.reduce((a, v) => a + v.paidCents, 0);
   const facts: [string, string][] = [['Agency', deal.agency], ['Contact', deal.contactName], ['Email', deal.contactEmail], ['Platforms', deal.platforms.join(', ')], ['Contract', deal.contractStatus], ['Usage rights', deal.usageRights], ['Exclusivity', deal.exclusivity], ['Payment terms', deal.paymentTerms], ['Content category', deal.contentCategory], ['Started', shortDate(deal.startedOn)], ['Last contact', shortDate(deal.lastContactOn)], ['Received on this deal', formatCents(received[deal.id] || 0)]];
   const cycle = (s: string) => { const order = ['not_started', 'in_progress', 'in_review', 'approved', 'posted']; return order[(order.indexOf(s) + 1) % order.length]; };
   const refresh = () => router.refresh();
@@ -70,10 +73,34 @@ export function DealDrawer({ deal, allDeals, invoices, received, onClose, onMove
           </form>}
         </section>
 
+        <section className="flex flex-col gap-2">
+          <Eyebrow>Contact</Eyebrow>
+          {(() => {
+            const linked = contacts.find(c => c.id === deal.contactId);
+            const options = [...contacts].sort((a, b) => Number(b.brandId === deal.brandId) - Number(a.brandId === deal.brandId) || a.name.localeCompare(b.name));
+            return (<>
+              {linked ? <Link href={`/contacts?contact=${linked.id}`} className="flex flex-col rounded-xl border border-line px-3 py-2.5 hover:border-faint"><span className="text-sm font-semibold">{linked.name}</span><span className="text-xs text-muted">{[linked.role, linked.email, linked.phone].filter(Boolean).join(' · ') || 'No details yet'}</span></Link>
+                : <p className="text-sm text-muted">{deal.contactName ? `${deal.contactName}${deal.contactEmail ? ' · ' + deal.contactEmail : ''} (not saved as a contact)` : 'No contact linked.'}</p>}
+              {!readOnly && <div className="flex flex-wrap items-center gap-2">
+                <Select aria-label="Linked contact" value={deal.contactId ?? ''} className="h-9 w-auto max-w-full" onChange={e => run(() => updateDeal({ id: deal.id, contactId: e.target.value }), refresh)}>
+                  <option value="">{options.length ? 'No contact' : 'No contacts saved yet'}</option>
+                  {options.map(c => <option key={c.id} value={c.id}>{c.name}{c.brandName ? ` · ${c.brandName}` : ''}</option>)}
+                </Select>
+                <Link href="/contacts" className="text-[13px] text-sub underline underline-offset-[3px]">Add a contact</Link>
+              </div>}
+            </>);
+          })()}
+        </section>
+
+        <section className="flex flex-col gap-2">
+          <Eyebrow>Tasks</Eyebrow>
+          <TaskList tasks={tasks.filter(t => t.dealId === deal.id)} today={today} readOnly={readOnly} link={{ dealId: deal.id, ...(deal.contactId ? { contactId: deal.contactId } : {}) }} showDone empty="No tasks for this partnership." />
+        </section>
+
         <section className="flex flex-col gap-3 rounded-xl bg-bg p-4">
           <Eyebrow>Relationship with {deal.brandName}</Eyebrow>
           <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-            {[['Received', formatCents(histReceived)], ['Collaborations', String(history.length)], ['Avg paid deal', paidDeals.length ? formatCents(histReceived / paidDeals.length) : '—'], ['Most recent', shortDate(history[0]?.startedOn)]].map(([k, v]) => <div key={k}><div className="text-[11px] text-muted">{k}</div><div className="tnum text-base font-semibold">{v}</div></div>)}
+            {[['Received', formatCents(histReceived)], ['Collaborations', String(history.length)], ['Avg paid deal', paidDeals.length ? formatCents(paidDeals.reduce((a, d) => a + (received[d.id] || 0), 0) / paidDeals.length) : '—'], ['Most recent', shortDate(history[0]?.startedOn)]].map(([k, v]) => <div key={k}><div className="text-[11px] text-muted">{k}</div><div className="tnum text-base font-semibold">{v}</div></div>)}
           </div>
           <div className="flex flex-col">{history.map(h => <div key={h.id} className="flex justify-between gap-2.5 border-t border-line py-1.5 text-[13px]"><span>{h.campaign || '—'}</span><span className="tnum whitespace-nowrap text-sub">{formatCents(h.feeCents)} · {STAGES.find(s => s[0] === h.stage)![1]}</span></div>)}</div>
           {brandInvoices.length > 0 && <div className="flex flex-col gap-1"><div className="text-xs font-semibold">Payment history</div>

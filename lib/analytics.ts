@@ -1,6 +1,6 @@
 import 'server-only';
 
-type Ev = 'onboarding_step' | 'onboarding_completed' | 'deal_created' | 'deliverable_created' | 'invoice_created' | 'payment_recorded' | 'income_recorded' | 'goal_set' | 'advisor_question' | 'draft_generated' | 'opportunity_added' | 'csv_imported' | 'prototype_imported' | 'screen_view';
+type Ev = 'onboarding_step' | 'onboarding_completed' | 'deal_created' | 'contact_created' | 'task_created' | 'deliverable_created' | 'invoice_created' | 'payment_recorded' | 'income_recorded' | 'goal_set' | 'advisor_question' | 'draft_generated' | 'opportunity_added' | 'csv_imported' | 'prototype_imported' | 'screen_view';
 
 /**
  * Opt-in product analytics. Records only the event name, never amounts, names, or record content.

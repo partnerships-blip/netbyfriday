@@ -4,6 +4,8 @@ export type Stream = 'brand' | 'affiliate' | 'events' | 'digital' | 'appearances
 export type Stage = 'lead' | 'pitching' | 'negotiating' | 'contracted' | 'in_progress' | 'completed' | 'paid' | 'lost';
 export type DeliverableStatus = 'not_started' | 'in_progress' | 'in_review' | 'approved' | 'posted' | 'scheduled';
 export type OpportunityStatus = 'new' | 'saved' | 'pitched' | 'dismissed';
+export type TaskStatus = 'open' | 'done';
+export type TaskPriority = 'low' | 'normal' | 'high';
 
 export interface Deliverable { id: string; dealId: string; name: string; dueOn: string; status: DeliverableStatus; notes: string }
 
@@ -11,7 +13,7 @@ export interface Deal {
   id: string; brandId: string; brandName: string; agency: string; contactName: string; contactEmail: string;
   campaign: string; description: string; feeCents: number; feeIsEstimate: boolean; stage: Stage; platforms: string[];
   contentCategory: string; contractStatus: string; usageRights: string; exclusivity: string; paymentTerms: string; notes: string;
-  startedOn: string; completedOn: string | null; lastContactOn: string; deliverables: Deliverable[];
+  startedOn: string; completedOn: string | null; lastContactOn: string; deliverables: Deliverable[]; contactId?: string | null;
   attachments?: { id: string; fileName: string }[];
 }
 
@@ -24,6 +26,14 @@ export interface IncomeEntry { id: string; stream: Stream; amountCents: number; 
 export interface Expense { id: string; category: string; amountCents: number; spentOn: string; note: string }
 export interface Opportunity { id: string; name: string; category: string; location: string; fit: string; source: string; angle: string; status: OpportunityStatus }
 export interface AudienceSnapshot { id: string; platform: string; followers: number; engagementRate: number | null; avgViews: number | null; capturedOn: string }
+export interface Contact {
+  id: string; brandId: string | null; brandName: string | null; name: string; email: string; role: string; phone: string; notes: string;
+  lastContactedOn: string | null; followUpOn: string | null;
+}
+export interface Task {
+  id: string; title: string; notes: string; dueOn: string | null; status: TaskStatus; priority: TaskPriority;
+  dealId: string | null; contactId: string | null; invoiceId: string | null; completedAt: string | null;
+}
 export interface ContentCategory { id: string; name: string; avgViews: number; posts: number }
 
 export interface CoreInput {
@@ -37,6 +47,8 @@ export interface CoreInput {
   opportunities: Opportunity[];
   audience: AudienceSnapshot[];
   categories: ContentCategory[];
+  contacts?: Contact[];
+  tasks?: Task[];
 }
 
 export interface Profile {
@@ -48,7 +60,7 @@ export interface Profile {
 export interface Brand { name: string; accent: 'cobalt' | 'lime' | 'ink' | 'clay'; headlineFont: 'serif' | 'sans'; logoUrl: string | null }
 
 export type Evidence = 'verified' | 'estimate' | 'suggested' | 'insufficient';
-export interface RecordRef { type: 'deal' | 'invoice' | 'payment' | 'income' | 'expense' | 'deliverable' | 'metric' | 'opportunity'; id: string; label: string }
+export interface RecordRef { type: 'deal' | 'invoice' | 'payment' | 'income' | 'expense' | 'deliverable' | 'metric' | 'opportunity' | 'contact' | 'task'; id: string; label: string }
 
 export interface Insight {
   id: string; category: 'Revenue' | 'Partnership' | 'Payment' | 'Growth' | 'Risk' | 'Getting started';

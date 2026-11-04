@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { compute, buildLedger, invoiceStates, parseMoneyToCents, lastMonths, formatCents } from './core.js';
+import { compute, buildLedger, invoiceStates, parseMoneyToCents, lastMonths, formatCents, termsDays } from './core.js';
 import type { CoreInput, Deal } from '../types';
 
 const base = (o: Partial<CoreInput> = {}): CoreInput => ({
@@ -141,5 +141,56 @@ describe('insights are only produced when data supports them', () => {
     const r = compute(base({ deals: [deal({ stage: 'lead', lastContactOn: '2026-10-01' })], invoices: [inv({ dealId: null, dueOn: '2026-09-01' })] }));
     for (const i of r.insights) expect(i.score).toBe(i.scores.impact + i.scores.urgency + i.scores.confidence + i.scores.goal);
     expect(r.insights.map(i => i.score)).toEqual([...r.insights.map(i => i.score)].sort((a, b) => b - a));
+  });
+});
+
+describe('workspace records (M2)', () => {
+  const task = (o: any) => ({ id: 't1', title: 'Follow up', notes: '', dueOn: null, status: 'open', priority: 'normal', dealId: null, contactId: null, invoiceId: null, completedAt: null, ...o });
+
+  it('reads NET terms', () => {
+    expect(termsDays('Net 45')).toBe(45);
+    expect(termsDays('net30')).toBe(30);
+    expect(termsDays('Due on receipt')).toBe(0);
+    expect(termsDays('60')).toBe(60);
+    expect(termsDays('whenever')).toBeNull();
+    expect(termsDays('')).toBeNull();
+  });
+
+  it('counts open, overdue and due-this-week tasks; done tasks are ignored', () => {
+    const m = compute(base({ tasks: [
+      task({ id: 'a', dueOn: '2026-10-20' }), task({ id: 'b', dueOn: '2026-10-22' }), task({ id: 'c', dueOn: '2026-10-28' }),
+      task({ id: 'd', dueOn: '2026-11-30' }), task({ id: 'e', dueOn: null }), task({ id: 'f', dueOn: '2026-10-01', status: 'done' })
+    ] }));
+    expect(m.openTasks.map((t: any) => t.id)).toEqual(['a', 'b', 'c', 'd', 'e']);
+    expect(m.overdueTasks.map((t: any) => t.id)).toEqual(['a']);
+    expect(m.dueTodayTasks.map((t: any) => t.id)).toEqual(['b']);
+    expect(m.weekTasks.map((t: any) => t.id)).toEqual(['b', 'c']);
+    expect(m.upcomingTasks.map((t: any) => t.id)).toEqual(['a', 'b', 'c', 'd', 'e']);
+    expect(m.notifications.some((n: any) => n.type === 'Task overdue')).toBe(true);
+  });
+
+  it('buckets expected cash into 8 weeks from unpaid, not-yet-overdue balances only', () => {
+    const m = compute(base({
+      invoices: [inv({ id: 'i1', number: 'A', dueOn: '2026-10-25', amountCents: 100000 }), inv({ id: 'i2', number: 'B', dueOn: '2026-11-05', amountCents: 200000 }),
+                 inv({ id: 'i3', number: 'C', dueOn: '2026-10-10', amountCents: 50000 }), inv({ id: 'i4', number: 'D', dueOn: '2027-01-30', amountCents: 70000 })],
+      payments: [{ id: 'p1', invoiceId: 'i2', amountCents: 50000, receivedOn: '2026-10-15', note: '' }]
+    }));
+    expect(m.expectedWeeks).toHaveLength(8);
+    expect(m.expectedWeeks[0]).toMatchObject({ start: '2026-10-22', end: '2026-10-28', cents: 100000 });
+    expect(m.expectedWeeks[2]).toMatchObject({ start: '2026-11-05', cents: 150000 }); // balance after partial payment
+    expect(m.expected8wCents).toBe(250000);         // overdue C and far-out D excluded
+    expect(m.expectedLaterCents).toBe(70000);
+    expect(m.thisMonthCents).toBe(50000);           // expected cash never counts as revenue
+  });
+
+  it('summarizes payment terms with average days to pay from fully paid invoices', () => {
+    const m = compute(base({
+      invoices: [inv({ id: 'i1', number: 'A', terms: 'Net 30', issuedOn: '2026-08-01', dueOn: '2026-08-31' }), inv({ id: 'i2', number: 'B', terms: 'net 30', issuedOn: '2026-09-01', dueOn: '2026-10-01' }),
+                 inv({ id: 'i3', number: 'C', terms: 'Net 60', issuedOn: '2026-10-01', dueOn: '2026-11-30' })],
+      payments: [{ id: 'p1', invoiceId: 'i1', amountCents: 320000, receivedOn: '2026-09-10', note: '' }]
+    }));
+    const n30 = m.termsStats.find((t: any) => t.days === 30);
+    expect(n30).toMatchObject({ openCount: 1, overdueCount: 1, paidCount: 1, avgDaysToPay: 40 });
+    expect(m.termsStats.find((t: any) => t.days === 60)).toMatchObject({ openCount: 1, overdueCount: 0, avgDaysToPay: null });
   });
 });

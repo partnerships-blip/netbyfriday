@@ -18,3 +18,13 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+
+  database:
+    # Runs the pgTAP privacy-rule tests (supabase/tests/database) against a real local Supabase stack.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with: { version: 2.122.1 }
+      - run: supabase start -x studio,imgproxy,inbucket,mailpit,realtime,edge-runtime,logflare,vector,supavisor
+      - run: supabase test db

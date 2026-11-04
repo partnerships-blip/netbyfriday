@@ -25,6 +25,7 @@ function dealRow(v: Partial<ReturnType<typeof S.DealSchema.parse>>) {
   const map: Record<string, string> = { agency: 'agency', contactName: 'contact_name', contactEmail: 'contact_email', campaign: 'campaign', description: 'description', feeIsEstimate: 'fee_is_estimate', stage: 'stage', platforms: 'platforms', contentCategory: 'content_category', contractStatus: 'contract_status', usageRights: 'usage_rights', exclusivity: 'exclusivity', paymentTerms: 'payment_terms', notes: 'notes', startedOn: 'started_on', lastContactOn: 'last_contact_on' };
   for (const [k, col] of Object.entries(map)) if ((v as any)[k] !== undefined) r[col] = (v as any)[k];
   if (v.fee !== undefined) r.fee_cents = v.fee;
+  if ((v as any).contactId !== undefined) r.contact_id = (v as any).contactId || null;
   return r;
 }
 
@@ -91,6 +92,65 @@ export async function importCsvDeals(rows: unknown) {
     }
     await track(c, 'csv_imported');
   }, 'Partnerships imported');
+}
+
+// ---------- contacts ----------
+function contactRow(v: Record<string, any>) {
+  const r: Record<string, unknown> = {};
+  const map: Record<string, string> = { name: 'name', email: 'email', role: 'role', phone: 'phone', notes: 'notes' };
+  for (const [k, col] of Object.entries(map)) if (v[k] !== undefined) r[col] = v[k];
+  if (v.lastContactedOn !== undefined) r.last_contacted_on = v.lastContactedOn || null;
+  if (v.followUpOn !== undefined) r.follow_up_on = v.followUpOn || null;
+  return r;
+}
+export async function createContact(raw: unknown) {
+  return run(async c => {
+    const v = S.ContactSchema.parse(raw);
+    const brand_id = v.brand ? await ensureBrand(c, v.brand) : null;
+    const row = ok(await c.sb.from('contacts').insert({ ...contactRow(v), workspace_id: c.ws.id, brand_id }).select('id').single());
+    await track(c, 'contact_created');
+    return row.id;
+  }, 'Contact added');
+}
+export async function updateContact(raw: unknown) {
+  return run(async c => {
+    const v = S.ContactPatchSchema.parse(raw);
+    const patch = contactRow(v);
+    if (v.brand !== undefined) patch.brand_id = v.brand ? await ensureBrand(c, v.brand) : null;
+    ok(await c.sb.from('contacts').update(patch).eq('id', v.id).eq('workspace_id', c.ws.id).select('id').single());
+  }, 'Contact updated');
+}
+export async function deleteContact(id: string) {
+  // Linked partnerships and tasks keep existing; their contact link is cleared by the database (on delete set null).
+  return run(async c => { S.uuid.parse(id); ok(await c.sb.from('contacts').delete().eq('id', id).eq('workspace_id', c.ws.id)); }, 'Contact deleted');
+}
+
+// ---------- tasks ----------
+function taskRow(v: Record<string, any>) {
+  const r: Record<string, unknown> = {};
+  if (v.title !== undefined) r.title = v.title; if (v.notes !== undefined) r.notes = v.notes; if (v.priority !== undefined) r.priority = v.priority;
+  if (v.dueOn !== undefined) r.due_on = v.dueOn || null;
+  for (const [k, col] of [['dealId', 'deal_id'], ['contactId', 'contact_id'], ['invoiceId', 'invoice_id']]) if (v[k] !== undefined) r[col] = v[k] || null;
+  return r;
+}
+export async function createTask(raw: unknown) {
+  return run(async c => {
+    const v = S.TaskSchema.parse(raw);
+    const row = ok(await c.sb.from('tasks').insert({ ...taskRow(v), workspace_id: c.ws.id }).select('id').single());
+    await track(c, 'task_created');
+    return row.id;
+  }, 'Task added');
+}
+export async function updateTask(raw: unknown) {
+  return run(async c => {
+    const v = S.TaskPatchSchema.parse(raw);
+    const patch = taskRow(v);
+    if (v.status !== undefined) { patch.status = v.status; patch.completed_at = v.status === 'done' ? new Date().toISOString() : null; }
+    ok(await c.sb.from('tasks').update(patch).eq('id', v.id).eq('workspace_id', c.ws.id).select('id').single());
+  });
+}
+export async function deleteTask(id: string) {
+  return run(async c => { S.uuid.parse(id); ok(await c.sb.from('tasks').delete().eq('id', id).eq('workspace_id', c.ws.id)); }, 'Task deleted');
 }
 
 // ---------- money ----------

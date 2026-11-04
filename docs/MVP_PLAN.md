@@ -134,7 +134,8 @@ Gmail or inbox scanning, Google Calendar, Instagram, TikTok and YouTube APIs, ba
 Keep the five existing migrations. Add **one** migration in M2, `20261105000001_workspace.sql`:
 - **`contacts`**: `id`, `workspace_id`, `brand_id` (nullable), `name`, `email`, `role`, `phone`, `notes`, `last_contacted_on`, `follow_up_on`, `created_at`. Partnerships get an optional `contact_id`; the existing `contact_name` and `contact_email` stay as a fallback and are moved into `contacts` by the migration.
 - **`tasks`**: `id`, `workspace_id`, `title`, `notes`, `due_on`, `status` (open/done), `priority` (low/normal/high), `deal_id`, `contact_id`, `invoice_id` (all nullable), `completed_at`, `created_at`.
-- **`invoices.terms_days`**: an integer derived from NET terms, so due dates are set automatically and can be edited.
+- ~~`invoices.terms_days`~~ Not needed: the invoice form reads the existing `terms` text (`termsDays()` in `lib/finance/core.js`) and fills the due date, which stays editable.
+- `analytics_events`: allow the `contact_created` and `task_created` event names.
 - Privacy rules on each new table using `is_workspace_member()`, plus new cases in `supabase/tests/database/rls_isolation.test.sql`.
 
 Billing tables (`subscriptions`, `billing_events`) are added in M5, only when the paid beta starts. The waitlist table is added in M4.
@@ -149,16 +150,23 @@ Each milestone ends with every test passing, a Vercel preview deploy, and a shor
 Deployed to staging (https://netbyfriday-x566.vercel.app, Supabase project `npyxfczyoykonpomnsqt`) on November 4, 2026. The milestone e2e suite passed there with the real AI provider (GitHub Actions, "Staging end-to-end").
 See §2.
 
-### M2 — Workspace databases (5–7 days)
-- Workspace migration (contacts, tasks, `terms_days`), with privacy-rule tests.
-- `<RecordView>` with Table / Board / Calendar. Apply it to Partnerships (add Table), Deliverables (Table + Calendar), Invoices (add Calendar), Tasks (all three) and Brands & Contacts (Table).
-- Related-records panel on partnership, brand, contact and invoice pages.
-- Dashboard: Tasks due, Expected cash for the next 8 weeks. Revenue: Payment terms panel.
-- Nav: Dashboard, Partnerships, Content (deliverables), Invoices & Revenue, Brands & Contacts, Tasks, AI Advisor, Settings.
-- Swap the demo fixture for the Poca sample data (`design-reference/nbf-data.js`). It is read-only and never seeded into production.
-- E2E: add a contact and a task, link them to the partnership, check that both appear on the partnership page and the dashboard.
+### M2 — Workspace databases ✅ (November 4, 2026)
+- Migration `20261105000001_workspace.sql`: `contacts`, `tasks`, `deals.contact_id`, backfill of existing free-text contacts into contact records (case-insensitive by email, else name), RLS, and 5 new pgTAP cases (23 total). CI now runs `supabase test db` on GitHub's runners.
+- `components/RecordView.tsx`: Table / Board / Calendar, filter chips with counts, search, sortable columns. Remembers the last view, filter and sort per record type in the browser.
+- Applied to Partnerships (existing drag-and-drop board + new Table), Content (deliverables: Table + Calendar), Invoices (new Calendar tab), Tasks (Table + Board + Calendar) and Brands & Contacts (Tables).
+- Related records:
+  - The partnership drawer gains a linked Contact and Tasks.
+  - A contact shows its partnerships and tasks.
+  - A brand shows its contacts, partnerships, invoices, received and unpaid.
+  - Tasks link to partnerships, contacts and invoices.
+- Dashboard: Tasks card and Expected cash, next 8 weeks. Invoices & Revenue: the 8-week chart and the Payment terms panel (open, overdue, average days to pay). Invoice due dates are filled from NET terms.
+- Engine: `termsDays`, task counts, 8-week buckets and terms statistics, with 4 new unit tests (34 total). The export includes contacts and tasks.
+- Fixed: "Received" on a brand and in the partnership drawer now counts payments on invoices billed to that brand by name, not only invoices linked to a partnership. It matches the payment history shown beside it.
+- E2E: add a contact; link it from the Table view; add a task from the partnership; check the task appears in the Tasks table, calendar and board, on the contact, and on the dashboard; check the deliverable appears on Content; check the invoice calendar and terms panel; check another creator's export has no contacts or tasks.
+- **Moved to M3:** the Poca demo fixture, so it is built together with the Advisor evaluation set that uses it.
 
 ### M3 — Advisor as the daily operator (4–5 days)
+- Swap the demo fixture for the Poca sample data (`design-reference/nbf-data.js`), with contacts and tasks. It is read-only and never seeded into production, and it is the basis for the evaluation set below.
 - Add contacts, tasks and per-brand history to the Advisor's context, with references.
 - Add "What's on my plate this week?" and "Who should I follow up with?" as built-in prompts with deterministic data behind them.
 - Drafts in the Advisor (pitch, follow-up, payment reminder), using the existing `/api/drafts`. Editable, with Copy and Open in email buttons. Never sent by NETBYFRIDAY.

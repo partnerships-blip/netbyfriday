@@ -2,7 +2,7 @@
 -- Verifies invite gating, workspace isolation, cross-tenant FK protection, and payment guards.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(18);
+select plan(23);
 
 insert into public.invite_codes(code, max_uses) values ('PGTAP-TEST', 5);
 
@@ -37,6 +37,13 @@ select lives_ok(
   $$ insert into public.payments (workspace_id, invoice_id, amount_cents, received_on)
      values ((select id from t_ws where owner_id = '11111111-1111-1111-1111-111111111111'), 'aaaaaaaa-0000-0000-0000-000000000003', 200000, '2026-10-10') $$,
   'A records a partial payment');
+insert into public.contacts (id, workspace_id, brand_id, name, email)
+  values ('aaaaaaaa-0000-0000-0000-000000000004', (select id from t_ws where owner_id = '11111111-1111-1111-1111-111111111111'), 'aaaaaaaa-0000-0000-0000-000000000001', 'Dana A', 'dana@a.test');
+select lives_ok(
+  $$ insert into public.tasks (workspace_id, title, deal_id, contact_id, invoice_id)
+     values ((select id from t_ws where owner_id = '11111111-1111-1111-1111-111111111111'), 'Send invoice reminder',
+             'aaaaaaaa-0000-0000-0000-000000000002', 'aaaaaaaa-0000-0000-0000-000000000004', 'aaaaaaaa-0000-0000-0000-000000000003') $$,
+  'A links a task to their own partnership, contact and invoice');
 select throws_ok(
   $$ insert into public.payments (workspace_id, invoice_id, amount_cents, received_on)
      values ((select id from t_ws where owner_id = '11111111-1111-1111-1111-111111111111'), 'aaaaaaaa-0000-0000-0000-000000000003', 300001, '2026-10-11') $$,
@@ -60,6 +67,11 @@ select is((select count(*)::int from public.deals), 0, 'B cannot see A deals');
 select is((select count(*)::int from public.invoices), 0, 'B cannot see A invoices');
 select is((select count(*)::int from public.payments), 0, 'B cannot see A payments');
 select is((select count(*)::int from public.invite_codes), 0, 'B cannot read invite codes');
+select is((select count(*)::int from public.contacts), 0, 'B cannot see A contacts');
+select is((select count(*)::int from public.tasks), 0, 'B cannot see A tasks');
+select throws_ok(
+  $$ insert into public.contacts (workspace_id, name) values ((select id from t_ws where owner_id = '11111111-1111-1111-1111-111111111111'), 'Hijack') $$,
+  '42501', null, 'B cannot insert a contact into A workspace');
 
 select throws_ok(
   $$ insert into public.deals (workspace_id, brand_id, campaign)
@@ -76,6 +88,11 @@ select throws_ok(
   $$ insert into public.payments (workspace_id, invoice_id, amount_cents, received_on)
      values ((select id from t_ws where owner_id = '22222222-2222-2222-2222-222222222222'), 'aaaaaaaa-0000-0000-0000-000000000003', 100, '2026-10-12') $$,
   '23503', null, 'B cannot attach a payment to A invoice from their own workspace');
+
+select throws_ok(
+  $$ insert into public.tasks (workspace_id, title, deal_id)
+     values ((select id from t_ws where owner_id = '22222222-2222-2222-2222-222222222222'), 'Steal', 'aaaaaaaa-0000-0000-0000-000000000002') $$,
+  '23503', null, 'B cannot link a task in their workspace to A partnership');
 
 select throws_ok($$ select public.admin_overview() $$, '42501', 'NOT_ADMIN', 'non-admin cannot read admin overview');
 

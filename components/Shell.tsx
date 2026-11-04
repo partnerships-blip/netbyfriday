@@ -11,14 +11,14 @@ import { markNotificationsRead, setDemoMode } from '@/app/(app)/actions';
 
 // V1 workspace navigation. Flagged screens (Insights, Opportunities, Audience) appear only when their flag is on.
 const NAV: (readonly [string, string])[] = [
-  ['/overview', 'Dashboard'], ['/partnerships', 'Partnerships'], ['/money', 'Invoices & Revenue'], ['/advisor', 'AI Advisor'],
+  ['/overview', 'Dashboard'], ['/partnerships', 'Partnerships'], ['/content', 'Content'], ['/money', 'Invoices & Revenue'], ['/contacts', 'Brands & Contacts'], ['/tasks', 'Tasks'], ['/advisor', 'AI Advisor'],
   ...(flag('insights') ? [['/intelligence', 'Insights'] as const] : []),
   ...(flag('opportunities') ? [['/opportunities', 'Opportunities'] as const] : []),
   ...(flag('audience') ? [['/audience', 'Audience'] as const] : []),
   ['/settings', 'Settings']
 ];
-const MOBILE = [['/overview', 'Home'], ['/partnerships', 'Deals'], ['/money', 'Money'], ['/advisor', 'Advisor']] as const;
-const MORE = ['/intelligence', '/opportunities', '/audience', '/settings'];
+const MOBILE = [['/overview', 'Home'], ['/partnerships', 'Deals'], ['/money', 'Money'], ['/tasks', 'Tasks']] as const;
+const MORE = ['/content', '/contacts', '/advisor', '/intelligence', '/opportunities', '/audience', '/settings'];
 
 type Notif = { key: string; type: string; text: string; href: string; unread: boolean };
 
@@ -51,7 +51,7 @@ export function Shell({ children, brandName, logoUrl, initials, name, business, 
               <Link key={href} href={href} aria-current={on ? 'page' : undefined} className={cx('flex h-9 items-center gap-3 rounded-lg px-2.5 text-sm transition hover:bg-[#EAE5F7]', on ? 'bg-[#DFFF43] font-bold text-ink' : 'font-medium text-sub')}>
                 <span className="w-4 font-mono text-[10px] text-faint">{String(i + 1).padStart(2, '0')}</span>
                 <span className="flex-1">{label}</span>
-                {!!b && <span className={cx('grid h-5 min-w-5 place-items-center rounded-full px-1.5 font-mono text-[11px]', href === '/money' ? 'bg-[#F3DDD6] text-danger' : 'bg-line text-sub')}>{b}</span>}
+                {!!b && <span className={cx('grid h-5 min-w-5 place-items-center rounded-full px-1.5 font-mono text-[11px]', (href === '/money' || href === '/tasks') ? 'bg-[#F3DDD6] text-danger' : 'bg-line text-sub')}>{b}</span>}
               </Link>
             );
           })}

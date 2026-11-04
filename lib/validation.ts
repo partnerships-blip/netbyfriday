@@ -31,9 +31,9 @@ export const DealSchema = z.object({
   description: text(5000).default(''), fee: optionalMoney('Fee'), feeIsEstimate: z.coerce.boolean().default(false), stage: z.enum(STAGE_KEYS).default('lead'),
   platforms: z.array(text(40)).max(10).default([]), contentCategory: text(80).default(''), contractStatus: text(200).default(''), usageRights: text(500).default(''),
   exclusivity: text(500).default(''), paymentTerms: text(200).default(''), notes: text(10000).default(''),
-  startedOn: isoDate.optional(), lastContactOn: isoDate.optional()
+  startedOn: isoDate.optional(), lastContactOn: isoDate.optional(), contactId: z.union([uuid, z.literal('')]).optional()
 });
-export const DealPatchSchema = DealSchema.partial().extend({ id: uuid });
+export const DealPatchSchema = DealSchema.partial().extend({ id: uuid, contactId: z.union([uuid, z.literal('')]).optional() });
 export const MoveDealSchema = z.object({ id: uuid, stage: z.enum(STAGE_KEYS) });
 
 export const DeliverableSchema = z.object({ dealId: uuid, name: req('Deliverable', 200), dueOn: isoDate, status: z.enum(DELIVERABLE_KEYS).default('not_started'), notes: text(2000).default('') });
@@ -61,3 +61,18 @@ export const FeedbackSchema = z.object({ kind: z.enum(['feedback', 'bug']), mess
 export const SignUpSchema = z.object({ email: z.string().trim().toLowerCase().email('Use a valid email address.'), password: z.string().min(10, 'Use at least 10 characters.').max(128), inviteCode: z.string().trim().toUpperCase().regex(/^[A-Z0-9-]{6,32}$/, 'Enter the invite code from your invitation.') });
 export const SignInSchema = z.object({ email: z.string().trim().toLowerCase().email(), password: z.string().min(1).max(128) });
 export const CsvDealRowSchema = z.object({ brand: req('brand', 120), campaign: text(200).default(''), fee: optionalMoney('fee'), stage: z.enum(STAGE_KEYS).default('paid'), date: isoDate.optional() });
+
+export const TASK_STATUS = ['open', 'done'] as const;
+export const TASK_PRIORITY = ['low', 'normal', 'high'] as const;
+const optDate = z.union([isoDate, z.literal('')]).optional();
+const optId = z.union([uuid, z.literal('')]).optional();
+export const ContactSchema = z.object({
+  name: req('Name', 120), brand: text(120).default(''), email, role: text(120).default(''), phone: text(40).default(''), notes: text(5000).default(''),
+  lastContactedOn: optDate, followUpOn: optDate
+});
+export const ContactPatchSchema = ContactSchema.partial().extend({ id: uuid });
+export const TaskSchema = z.object({
+  title: req('Title', 200), notes: text(5000).default(''), dueOn: optDate, priority: z.enum(TASK_PRIORITY).default('normal'),
+  dealId: optId, contactId: optId, invoiceId: optId
+});
+export const TaskPatchSchema = TaskSchema.partial().extend({ id: uuid, status: z.enum(TASK_STATUS).optional() });
