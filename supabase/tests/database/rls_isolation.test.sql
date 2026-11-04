@@ -78,9 +78,9 @@ select throws_ok(
      values ((select id from t_ws where owner_id = '11111111-1111-1111-1111-111111111111'), 'aaaaaaaa-0000-0000-0000-000000000001', 'Hijack') $$,
   '42501', null, 'B cannot insert into A workspace');
 
-select is(
-  (with u as (update public.deals set notes = 'tampered' where id = 'aaaaaaaa-0000-0000-0000-000000000002' returning 1) select count(*)::int from u),
-  0, 'B cannot update A deal');
+select is_empty(
+  $$ update public.deals set notes = 'tampered' where id = 'aaaaaaaa-0000-0000-0000-000000000002' returning id $$,
+  'B cannot update A deal');
 
 insert into public.brands (id, workspace_id, name)
   values ('bbbbbbbb-0000-0000-0000-000000000001', (select id from t_ws where owner_id = '22222222-2222-2222-2222-222222222222'), 'Brand B');
