@@ -1,11 +1,11 @@
 # Applies supabase/migrations (and the staging-only invite codes in seed.sql) to the STAGING Supabase project.
-# Needs repository secrets SUPABASE_ACCESS_TOKEN and SUPABASE_DB_PASSWORD, and the variable SUPABASE_PROJECT_REF.
+# Needs repository secrets SUPABASE_ACCESS_TOKEN and SUPABASE_DB_PASSWORD. The staging project ref is not secret.
 # Never point this at production: --include-seed would add test invite codes.
 name: Staging database
 on:
   push:
     branches: [main]
-    paths: ['supabase/**']
+    paths: ['supabase/**', '.github/workflows/staging-db.yml']
   workflow_dispatch:
 concurrency: staging-db
 jobs:
@@ -14,7 +14,7 @@ jobs:
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-      PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+      PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF || 'npyxfczyoykonpomnsqt' }}  # netbyfriday-staging
     steps:
       - uses: actions/checkout@v4
       - uses: supabase/setup-cli@v1
