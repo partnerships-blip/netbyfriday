@@ -2,6 +2,7 @@
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
+import { normalizeSiteUrl } from '@/lib/site';
 import { SignInSchema, SignUpSchema } from '@/lib/validation';
 
 export type AuthState = { error?: string; notice?: string };
@@ -10,7 +11,7 @@ export async function signUp(_: AuthState, form: FormData): Promise<AuthState> {
   const parsed = SignUpSchema.safeParse({ email: form.get('email'), password: form.get('password'), inviteCode: form.get('inviteCode') });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   const { email, password, inviteCode } = parsed.data;
-  const origin = process.env.NEXT_PUBLIC_SITE_URL || headers().get('origin') || '';
+  const origin = process.env.NEXT_PUBLIC_SITE_URL ? normalizeSiteUrl(process.env.NEXT_PUBLIC_SITE_URL) : headers().get('origin') || '';
   const sb = createClient();
   // The database trigger validates and consumes the invite code atomically. An invalid code aborts the sign-up.
   const { data, error } = await sb.auth.signUp({ email, password, options: { data: { invite_code: inviteCode }, emailRedirectTo: `${origin}/auth/callback?next=/onboarding` } });
@@ -39,7 +40,7 @@ export async function signIn(_: AuthState, form: FormData): Promise<AuthState> {
 export async function requestReset(_: AuthState, form: FormData): Promise<AuthState> {
   const email = String(form.get('email') || '').trim().toLowerCase();
   if (!/^\S+@\S+\.\S+$/.test(email)) return { error: 'Enter a valid email address.' };
-  const origin = process.env.NEXT_PUBLIC_SITE_URL || headers().get('origin') || '';
+  const origin = process.env.NEXT_PUBLIC_SITE_URL ? normalizeSiteUrl(process.env.NEXT_PUBLIC_SITE_URL) : headers().get('origin') || '';
   await createClient().auth.resetPasswordForEmail(email, { redirectTo: `${origin}/auth/callback?next=/reset/update` });
   return { notice: 'If that email has an account, a reset link is on its way.' };
 }
