@@ -78,7 +78,7 @@ test('advisor evaluation on the Poca demo workspace', async ({ page }) => {
     const body = await res.json().catch(() => ({}));
     const r: Reply = body.reply ?? { answer: body.error ?? `HTTP ${res.status()}`, facts: [], drafts: [], actions: [], parseError: true };
     const reasons: string[] = [];
-    if (r.parseError) { parseErrors++; reasons.push('no checked answer: ' + r.answer); }
+    if (r.parseError) { parseErrors++; reasons.push(`no checked answer (${JSON.stringify(body.diag ?? {})})`); }
     const vt = verifiedText(r), all = r.answer + ' | ' + vt;
     for (const w of c.wrong ?? []) {
       const hit = r.facts.filter(f => f.verified).find(f => (typeof w === 'function' ? w(f.statement) : w.test(f.statement)));

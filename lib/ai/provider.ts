@@ -1,7 +1,13 @@
 import 'server-only';
 
 export interface ChatMessage { role: 'user' | 'assistant'; content: string }
-export interface AIProvider { name: string; complete(opts: { system: string; messages: ChatMessage[]; maxTokens: number }): Promise<string> }
+export interface Completion { text: string; stopReason: string | null }
+export interface AIProvider {
+  name: string;
+  complete(opts: { system: string; messages: ChatMessage[]; maxTokens: number }): Promise<string>;
+  /** Same call, plus why the model stopped ('max_tokens' means the answer was cut off). */
+  completeWithMeta(opts: { system: string; messages: ChatMessage[]; maxTokens: number }): Promise<Completion>;
+}
 export class AIUnavailable extends Error {}
 
 function anthropic(): AIProvider {
@@ -9,7 +15,8 @@ function anthropic(): AIProvider {
   if (!key || !model) throw new AIUnavailable('AI is not configured.');
   return {
     name: 'anthropic',
-    async complete({ system, messages, maxTokens }) {
+    async complete(o) { return (await this.completeWithMeta(o)).text; },
+    async completeWithMeta({ system, messages, maxTokens }) {
       // ANTHROPIC_BASE_URL is optional (defaults to the public API). The e2e suite points it at a local stub.
       const res = await fetch((process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com').replace(/\/$/, '') + '/v1/messages', {
         method: 'POST',
@@ -19,7 +26,7 @@ function anthropic(): AIProvider {
       });
       if (!res.ok) { console.error('[ai] anthropic', res.status, await res.text().catch(() => '')); throw new AIUnavailable('The AI service returned an error.'); }
       const j = await res.json();
-      return (j.content ?? []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('').trim();
+      return { text: (j.content ?? []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('').trim(), stopReason: j.stop_reason ?? null };
     }
   };
 }
@@ -29,7 +36,8 @@ function openaiCompatible(): AIProvider {
   if (!base || !key || !model) throw new AIUnavailable('AI is not configured.');
   return {
     name: 'openai-compatible',
-    async complete({ system, messages, maxTokens }) {
+    async complete(o) { return (await this.completeWithMeta(o)).text; },
+    async completeWithMeta({ system, messages, maxTokens }) {
       const res = await fetch(base.replace(/\/$/, '') + '/chat/completions', {
         method: 'POST', headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
         body: JSON.stringify({ model, max_tokens: maxTokens, messages: [{ role: 'system', content: system }, ...messages] }),
@@ -37,7 +45,8 @@ function openaiCompatible(): AIProvider {
       });
       if (!res.ok) { console.error('[ai] openai-compatible', res.status); throw new AIUnavailable('The AI service returned an error.'); }
       const j = await res.json();
-      return String(j.choices?.[0]?.message?.content ?? '').trim();
+      const finish = j.choices?.[0]?.finish_reason ?? null;
+      return { text: String(j.choices?.[0]?.message?.content ?? '').trim(), stopReason: finish === 'length' ? 'max_tokens' : finish };
     }
   };
 }

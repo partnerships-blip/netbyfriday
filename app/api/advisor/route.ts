@@ -22,14 +22,20 @@ export async function POST(req: Request) {
 
   const ctx = buildAdvisorContext(app.input, app.metrics, app.profile);
   const history = app.demo ? [] : app.advisorHistory.slice(-8).map((h: any) => ({ role: h.role as 'user' | 'assistant', content: h.role === 'assistant' ? JSON.stringify({ answer: h.content }) : h.content }));
-  let raw: string;
+  let raw: string, stopReason: string | null = null;
   try {
-    raw = await getProvider().complete({ system: advisorSystemPrompt(app.brand.name, ctx), messages: [...history, { role: 'user', content: parsed.data.question }], maxTokens: 1600 });
+    const out = await getProvider().completeWithMeta({ system: advisorSystemPrompt(app.brand.name, ctx), messages: [...history, { role: 'user', content: parsed.data.question }], maxTokens: 3000 });
+    raw = out.text; stopReason = out.stopReason;
   } catch (e) {
     if (!(e instanceof AIUnavailable)) console.error('[advisor]', e);
     return NextResponse.json({ error: 'The Advisor is unavailable right now. Your records are unchanged.' }, { status: 503 });
   }
   const reply = verifyReply(raw, ctx);
+  if (reply.parseError) {
+    // Diagnostics only (no record content): why the model stopped and how long its output was.
+    console.error('[advisor] unparseable reply', { stopReason, length: raw.length, head: raw.slice(0, 40).replace(/[^\x20-\x7E]/g, '?') });
+    if (stopReason === 'max_tokens') reply.answer = 'That answer ran too long to check. Try asking about one part at a time.';
+  }
   if (!app.demo) {
     await sb.from('advisor_messages').insert([
       { workspace_id: app.ws.id, user_id: user.id, role: 'user', content: parsed.data.question },
@@ -37,5 +43,5 @@ export async function POST(req: Request) {
     ]);
   }
   await track({ sb, user }, 'advisor_question');
-  return NextResponse.json({ reply });
+  return NextResponse.json({ reply, ...(reply.parseError ? { diag: { stopReason, length: raw.length, startsWith: raw.slice(0, 12) } } : {}) });
 }
