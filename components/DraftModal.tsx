@@ -4,7 +4,7 @@ import { Modal } from './Modal';
 import { Btn, Eyebrow, Textarea } from './ui';
 import { toast } from './Toaster';
 
-export type DraftTarget = { kind: string; dealId?: string; invoiceId?: string; opportunityId?: string; label: string; to?: string };
+export type DraftTarget = { kind: string; dealId?: string; invoiceId?: string; opportunityId?: string; contactId?: string; label: string; to?: string };
 
 /** AI-written email draft. Always editable; never sent. "Approve" only opens the user's own email app. */
 export function DraftModal({ target, onClose }: { target: DraftTarget | null; onClose: () => void }) {
@@ -14,7 +14,7 @@ export function DraftModal({ target, onClose }: { target: DraftTarget | null; on
     if (!target) return;
     setBusy(true); setText('');
     try {
-      const res = await fetch('/api/drafts', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: target.kind, dealId: target.dealId, invoiceId: target.invoiceId, opportunityId: target.opportunityId }) });
+      const res = await fetch('/api/drafts', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: target.kind, dealId: target.dealId, invoiceId: target.invoiceId, opportunityId: target.opportunityId, contactId: target.contactId }) });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error || 'Could not write a draft.');
       setText(j.text);

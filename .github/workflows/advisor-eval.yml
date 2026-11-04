@@ -1,0 +1,23 @@
+# Runs the 20-question AI Advisor evaluation against the staging site, using the real AI key configured in Vercel.
+# Results appear in the run summary and as an artifact. Started by hand.
+name: Advisor evaluation
+on:
+  workflow_dispatch:
+    inputs:
+      url: { description: 'Staging URL (https://…)', required: true }
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    env:
+      E2E_BASE_URL: ${{ github.event.inputs.url }}
+      E2E_REAL_AI: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test -c playwright.eval.config.ts
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: advisor-eval, path: test-results, retention-days: 30 }

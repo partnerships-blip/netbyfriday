@@ -106,6 +106,23 @@ test.describe.serial('core creator journey', () => {
     await page.reload();                                                            //     history is saved to the workspace
     await expect(page.getByText('How much have I been paid, and what is still owed?')).toBeVisible();
 
+    if (!process.env.E2E_REAL_AI) {                                                  // M3: proposed change needs Confirm; drafts open for review
+      await page.getByLabel('Ask the Advisor').fill("What's on my plate this week?");
+      await page.getByRole('button', { name: 'Ask', exact: true }).click();
+      await expect(page.getByText('Suggested changes')).toBeVisible({ timeout: 45_000 });
+      await expect(page.getByText(/Check in with Testbrand Co on deliverables/)).toBeVisible();
+      await expect(page.getByText(/\$3,000/).filter({ hasText: 'record' })).toHaveCount(0);   // the planted payment action was dropped
+      await page.getByRole('button', { name: 'Confirm' }).click();
+      await expect(page.getByText('Done', { exact: true })).toBeVisible();
+      await shot(page, '12-advisor-actions');
+      await page.getByRole('button', { name: 'Write draft' }).click();
+      await expect(page.getByLabel('Draft text')).toHaveValue(/Quick follow-up on the invoice/);
+      await expect(page.getByRole('button', { name: /Approve/ })).toBeVisible();
+      await page.getByRole('button', { name: 'Discard' }).click();
+      await page.goto('/tasks');
+      await expect(page.getByRole('row', { name: /Check in with Testbrand Co on deliverables/ })).toContainText('Testbrand Co – Launch');
+    }
+
     // ---- Milestone 2: connected records ----
     await page.goto('/contacts');                                                   // 12: a contact at the brand
     await page.getByRole('button', { name: 'New contact' }).click();

@@ -45,10 +45,25 @@ export function buildAdvisorContext(input: CoreInput, m: any, profile: { display
   const expenses = input.expenses.map(x => ({ ref: put('expense:' + x.id, clean(x.category, 80), [x.amountCents]), category: clean(x.category, 120), amount: formatCentsExact(x.amountCents), date: x.spentOn }));
   const opportunities = input.opportunities.filter(o => o.status !== 'dismissed').map(o => ({ ref: put('opportunity:' + o.id, clean(o.name, 80), []), name: clean(o.name, 120), category: o.category, fit: clean(o.fit, 300), source: clean(o.source, 200), status: o.status }));
   const insights = m.insights.slice(0, 10).map((i: any) => ({ title: i.title, evidence: i.evidence, score: i.score }));
+  const contacts = (input.contacts ?? []).map(c => ({ ref: put('contact:' + c.id, clean(c.name, 80), []), name: clean(c.name, 120), brand: clean(c.brandName, 120), role: clean(c.role, 120), email: clean(c.email, 160),
+    lastContacted: c.lastContactedOn, followUpOn: c.followUpOn, partnershipRefs: input.deals.filter(d => d.contactId === c.id).map(d => 'deal:' + d.id), notes: clean(c.notes, 300) }));
+  const tasks = (input.tasks ?? []).filter(t => t.status === 'open').map(t => ({ ref: put('task:' + t.id, clean(t.title, 80), []), title: clean(t.title, 200), due: t.dueOn, priority: t.priority,
+    dealRef: t.dealId ? 'deal:' + t.dealId : null, contactRef: t.contactId ? 'contact:' + t.contactId : null, invoiceRef: t.invoiceId ? 'invoice:' + t.invoiceId : null, notes: clean(t.notes, 300) }));
+  // Per-brand history. Received = payments on the brand's invoices (linked, or billed to it by name), the same basis as the Brands screen.
+  const brandNames = Array.from(new Set(input.deals.map(d => d.brandName)));
+  const brands = brandNames.map(name => {
+    const ds = input.deals.filter(d => d.brandName === name), ids = new Set(ds.map(d => d.id));
+    const inv = m.invoices.filter((v: any) => (v.dealId && ids.has(v.dealId)) || v.clientName.toLowerCase() === name.toLowerCase());
+    const received = inv.reduce((a: number, v: any) => a + v.paidCents, 0), unpaid = inv.reduce((a: number, v: any) => a + v.balanceCents, 0);
+    return { ref: put('brand:' + name.toLowerCase(), clean(name, 80), [received, unpaid]), name: clean(name, 120), partnershipRefs: ds.map(d => 'deal:' + d.id), received: formatCentsExact(received), unpaid: formatCentsExact(unpaid),
+      lastContact: ds.map(d => d.lastContactOn).sort().slice(-1)[0] };
+  });
+  const thisWeek = (m.agenda ?? []).filter((a: any) => refs.has(a.ref)).map((a: any) => ({ ref: a.ref, kind: a.kind, date: a.date, late: a.late, what: clean(a.text, 200) }));
+  const followUps = (m.followUps ?? []).filter((f: any) => refs.has(f.ref)).map((f: any) => ({ ref: f.ref, who: clean(f.who, 160), reason: clean(f.reason, 200), since: f.since }));
 
   const json = JSON.stringify({ today: input.today, revenueBasis: 'cash: revenue = payments received + direct income entries; deal fees and unpaid invoices are not revenue',
     profile: { name: clean(profile.displayName, 120), business: clean(profile.businessName, 120), niche: clean(profile.niche, 80), priority: clean(profile.priority, 80) },
-    metrics, invoices, payments, income, deals, expenses, opportunities, rankedInsights: insights });
+    metrics, thisWeek, followUps, invoices, payments, income, deals, brands, contacts, tasks, expenses, opportunities, rankedInsights: insights });
   return { refs, json };
 }
 
@@ -63,7 +78,10 @@ Respond with a single JSON object and nothing else:
   "facts": [{"statement": "A factual claim about their records.", "evidence": ["<ref>", ...], "calculation": "Optional arithmetic, e.g. $4,200 + $1,000 = $5,200"}],
   "forecasts": [{"statement": "A projection, clearly conditional.", "basis": ["<ref>", ...], "assumptions": "What would have to hold."}],
   "recommendations": [{"statement": "A suggested action.", "because": ["<ref>", ...]}],
-  "missing": ["Information you would need to answer better."]
+  "missing": ["Information you would need to answer better."],
+  "drafts": [{"kind": "<one of: ${DRAFT_KINDS.join(' | ')}>", "ref": "<deal:, invoice: or contact: ref>", "why": "One short reason."}],
+  "actions": [{"type": "create_task", "title": "Short task", "due": "YYYY-MM-DD or null", "refs": ["<deal:, contact: or invoice: refs it belongs to>"], "because": ["<ref>"]},
+              {"type": "set_deliverable_status", "ref": "<deliverable: ref>", "status": "<not_started | in_progress | in_review | approved | posted | scheduled>", "because": ["<ref>"]}]
 }
 
 Rules:
@@ -73,8 +91,12 @@ Rules:
 - Recommendations are suggestions, not facts.
 - If the records cannot answer the question, say so in "answer" and list what is missing.
 - For tax, legal, or accounting questions, give general information only and suggest a qualified professional.
-- You cannot send emails or take actions. You can only suggest drafts the creator reviews.
-- Keep the whole response under 250 words.
+- "thisWeek" and "followUps" are calculated from the records. For "what's on my plate" or "who should I follow up with", answer from those lists, cite their refs, and keep their order.
+- "drafts": offer at most 2 email drafts when a message to someone would clearly help. The creator reviews and sends them; you never send anything.
+- "actions": propose at most 3 changes, only of the two types shown, only when clearly useful. They happen only if the creator clicks Confirm.
+  Never propose changes to invoices, payments, income, expenses, fees or deal stages; the creator edits money records themselves.
+- Leave "drafts" and "actions" empty when they are not needed.
+- Keep the whole response under 300 words.
 
 <records>
 ${ctx.json}
@@ -88,8 +110,17 @@ export interface AdvisorReply {
   recommendations: { statement: string; because: string[] }[];
   missing: string[];
   unverifiedAnswerAmounts: string[];
+  drafts: { kind: string; ref: string; label: string; why: string; dealId?: string; invoiceId?: string; contactId?: string }[];
+  actions: AdvisorAction[];
   parseError?: boolean;
 }
+export type AdvisorAction =
+  | { type: 'create_task'; title: string; due: string | null; dealId?: string; contactId?: string; invoiceId?: string; labels: string[]; because: string[] }
+  | { type: 'set_deliverable_status'; deliverableId: string; label: string; status: string; because: string[] };
+export const DRAFT_KINDS = ['Following up on an unanswered proposal', 'Requesting a contract', 'Following up on payment', 'Reconnecting with a previous partner', 'Proposing a new campaign'];
+const DELIVERABLE_STATUSES = ['not_started', 'in_progress', 'in_review', 'approved', 'posted', 'scheduled'];
+const ISO = /^\d{4}-\d{2}-\d{2}$/;
+const idOf = (ref: string, type: string) => (ref.startsWith(type + ':') ? ref.slice(type.length + 1) : null);
 
 const AMOUNT_RE = /\$\s?\d[\d,]*(?:\.\d{1,2})?/g;
 export const amountsIn = (s: string) => (s.match(AMOUNT_RE) || []).map(a => Math.round(parseFloat(a.replace(/[$,\s]/g, '')) * 100));
@@ -98,7 +129,7 @@ export const amountsIn = (s: string) => (s.match(AMOUNT_RE) || []).map(a => Math
 export function verifyReply(raw: string, ctx: AdvisorContext): AdvisorReply {
   let j: any;
   try { j = JSON.parse(raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1)); }
-  catch { return { answer: 'I could not produce a checked answer for that. Try rephrasing the question.', facts: [], forecasts: [], recommendations: [], missing: [], unverifiedAnswerAmounts: [], parseError: true }; }
+  catch { return { answer: 'I could not produce a checked answer for that. Try rephrasing the question.', facts: [], forecasts: [], recommendations: [], missing: [], unverifiedAnswerAmounts: [], drafts: [], actions: [], parseError: true }; }
   const arr = (x: any) => (Array.isArray(x) ? x : []);
   const strs = (x: any) => arr(x).filter((r: any) => typeof r === 'string').slice(0, 12);
   const backed = new Set<number>();
@@ -128,6 +159,31 @@ export function verifyReply(raw: string, ctx: AdvisorContext): AdvisorReply {
     forecasts: arr(j.forecasts).slice(0, 6).map((f: any) => ({ statement: String(f?.statement ?? '').slice(0, 600), basis: strs(f?.basis).filter((r: string) => ctx.refs.has(r)), assumptions: f?.assumptions ? String(f.assumptions).slice(0, 300) : undefined })),
     recommendations: arr(j.recommendations).slice(0, 6).map((r: any) => ({ statement: String(r?.statement ?? '').slice(0, 600), because: strs(r?.because).filter((x: string) => ctx.refs.has(x)) })),
     missing: strs(j.missing).map((s: string) => s.slice(0, 200)),
-    unverifiedAnswerAmounts
+    unverifiedAnswerAmounts,
+    drafts: arr(j.drafts).slice(0, 2).flatMap((d: any) => {
+      const kind = String(d?.kind ?? ''), ref = String(d?.ref ?? '');
+      if (!DRAFT_KINDS.includes(kind) || !ctx.refs.has(ref)) return [];
+      const ids = { dealId: idOf(ref, 'deal') ?? undefined, invoiceId: idOf(ref, 'invoice') ?? undefined, contactId: idOf(ref, 'contact') ?? undefined };
+      if (!ids.dealId && !ids.invoiceId && !ids.contactId) return [];
+      return [{ kind, ref, label: ctx.refs.get(ref)!.label, why: String(d?.why ?? '').slice(0, 200), ...ids }];
+    }),
+    // Proposed changes are limited to two non-financial types, must point at real records, and run only after the creator confirms.
+    actions: arr(j.actions).slice(0, 3).flatMap((a: any): AdvisorAction[] => {
+      const because = strs(a?.because).filter((r: string) => ctx.refs.has(r));
+      if (a?.type === 'create_task') {
+        const title = String(a?.title ?? '').trim().slice(0, 200);
+        const due = typeof a?.due === 'string' && ISO.test(a.due) ? a.due : null;
+        const links = strs(a?.refs).filter((r: string) => ctx.refs.has(r));
+        if (!title) return [];
+        const pick = (t: string) => links.map((r: string) => idOf(r, t)).find(Boolean) ?? undefined;
+        return [{ type: 'create_task', title, due, dealId: pick('deal'), contactId: pick('contact'), invoiceId: pick('invoice'), labels: links.filter((r: string) => /^(deal|contact|invoice):/.test(r)).map((r: string) => ctx.refs.get(r)!.label), because }];
+      }
+      if (a?.type === 'set_deliverable_status') {
+        const ref = String(a?.ref ?? ''), id = idOf(ref, 'deliverable'), status = String(a?.status ?? '');
+        if (!id || !ctx.refs.has(ref) || !DELIVERABLE_STATUSES.includes(status)) return [];
+        return [{ type: 'set_deliverable_status', deliverableId: id, label: ctx.refs.get(ref)!.label, status, because }];
+      }
+      return [];
+    })
   };
 }

@@ -194,3 +194,19 @@ describe('workspace records (M2)', () => {
     expect(m.termsStats.find((t: any) => t.days === 60)).toMatchObject({ openCount: 1, overdueCount: 0, avgDaysToPay: null });
   });
 });
+
+describe('Poca demo workspace (read-only fixture)', async () => {
+  const { demoData } = await import('../demo/fixture');
+  const m: any = compute(demoData().input);
+  it('is internally consistent: every payment matches an invoice, no ledger issues', () => {
+    expect(m.issues).toEqual([]);
+    expect(m.invoices.every((v: any) => v.overpaidCents === 0)).toBe(true);
+  });
+  it('produces the figures the Advisor evaluation expects', () => {
+    expect(m.outstandingCents).toBe(1780000);
+    expect(m.overdueInvoices.map((v: any) => v.number)).toEqual(['INV-2041']);
+    expect(m.pipelineCents).toBe(1930000);
+    expect(m.agenda.length).toBeGreaterThanOrEqual(5);
+    expect(m.followUps.some((f: any) => f.ref === 'deal:demo-d5')).toBe(true);
+  });
+});

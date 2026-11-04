@@ -24,7 +24,7 @@ export async function POST(req: Request) {
   const history = app.demo ? [] : app.advisorHistory.slice(-8).map((h: any) => ({ role: h.role as 'user' | 'assistant', content: h.role === 'assistant' ? JSON.stringify({ answer: h.content }) : h.content }));
   let raw: string;
   try {
-    raw = await getProvider().complete({ system: advisorSystemPrompt(app.brand.name, ctx), messages: [...history, { role: 'user', content: parsed.data.question }], maxTokens: 1200 });
+    raw = await getProvider().complete({ system: advisorSystemPrompt(app.brand.name, ctx), messages: [...history, { role: 'user', content: parsed.data.question }], maxTokens: 1600 });
   } catch (e) {
     if (!(e instanceof AIUnavailable)) console.error('[advisor]', e);
     return NextResponse.json({ error: 'The Advisor is unavailable right now. Your records are unchanged.' }, { status: 503 });

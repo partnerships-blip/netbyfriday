@@ -6,7 +6,10 @@ http.createServer((req, res) => {
   let body = '';
   req.on('data', c => (body += c));
   req.on('end', () => {
-    const { system } = JSON.parse(body || '{}');
+    const { system, messages = [] } = JSON.parse(body || '{}');
+    const question = String(messages[messages.length - 1]?.content ?? '');
+    const send = text => { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ content: [{ type: 'text', text }] })); };
+    if (system.startsWith('You write short business emails')) return send('Subject: Quick follow-up on the invoice\n\nHi [Name],\n\nJust checking in on the open balance. Thank you!\n\nAvery');
     const records = JSON.parse(system.slice(system.lastIndexOf('<records>') + 9, system.lastIndexOf('</records>')));
     const m = Object.fromEntries(records.metrics.map(x => [x.ref, x.value]));
     const inv = records.invoices[0];
@@ -20,7 +23,15 @@ http.createServer((req, res) => {
       ],
       forecasts: [], recommendations: inv ? [{ statement: `Send a friendly reminder before ${inv.due}.`, because: [inv.ref] }] : [], missing: []
     };
-    res.writeHead(200, { 'content-type': 'application/json' });
-    res.end(JSON.stringify({ content: [{ type: 'text', text: JSON.stringify(reply) }] }));
+    if (/plate/i.test(question)) {
+      // A weekly-agenda answer with one proposed task and one draft, exactly in the shape the real model must use.
+      const deal = records.deals[0];
+      reply.answer = `You have ${records.thisWeek.length} things this week.`;
+      reply.facts = records.thisWeek.slice(0, 3).map(a => ({ statement: a.what.replace(/\$[\d,.]+/g, ''), evidence: [a.ref] }));
+      reply.actions = deal ? [{ type: 'create_task', title: `Check in with ${deal.brand} on deliverables`, due: null, refs: [deal.ref], because: [deal.ref] },
+                              { type: 'record_payment', ref: inv?.ref, amount: '$3,000' }] : [];
+      reply.drafts = inv ? [{ kind: 'Following up on payment', ref: inv.ref, why: 'Balance still open.' }] : [];
+    }
+    send(JSON.stringify(reply));
   });
 }).listen(4010, '127.0.0.1', () => console.log('ai stub on :4010'));

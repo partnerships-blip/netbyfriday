@@ -2,7 +2,7 @@ import { defineConfig } from '@playwright/test';
 
 const stubAI = !process.env.E2E_REAL_AI;
 export default defineConfig({
-  testDir: 'tests/e2e',
+  testDir: 'tests/e2e',  // the Advisor evaluation lives in tests/eval (playwright.eval.config.ts)
   timeout: 90_000,
   fullyParallel: false,
   use: { baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:3000', trace: 'retain-on-failure' },

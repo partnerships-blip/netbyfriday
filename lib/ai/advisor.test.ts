@@ -53,3 +53,46 @@ describe('verifyReply', () => {
     expect(r.recommendations[0].because).toEqual(['invoice:i1']);
   });
 });
+
+describe('advisor drafts and proposed actions (M3)', () => {
+  const rich: CoreInput = {
+    ...input,
+    deals: [{ id: 'd1', brandId: 'b1', brandName: 'Brightmill', agency: '', contactName: 'Dana', contactEmail: 'dana@b.example', campaign: 'Bake Week', description: '', feeCents: 320000, feeIsEstimate: false, stage: 'in_progress', platforms: [],
+      contentCategory: '', contractStatus: '', usageRights: '', exclusivity: '', paymentTerms: '', notes: '', startedOn: '2026-10-01', completedOn: null, lastContactOn: '2026-10-20', contactId: 'c1',
+      deliverables: [{ id: 'x1', dealId: 'd1', name: '1 Reel', dueOn: '2026-10-25', status: 'in_progress', notes: '' }] }],
+    contacts: [{ id: 'c1', brandId: 'b1', brandName: 'Brightmill', name: 'Dana', email: 'dana@b.example', role: '', phone: '', notes: '', lastContactedOn: '2026-10-20', followUpOn: '2026-10-21' }],
+    tasks: [{ id: 't1', title: 'Send recap', notes: '', dueOn: '2026-10-23', status: 'open', priority: 'normal', dealId: 'd1', contactId: null, invoiceId: null, completedAt: null }]
+  };
+  const c2 = buildAdvisorContext(rich, compute(rich), { displayName: 'Noor', businessName: '', niche: '', priority: '' });
+
+  it('gives contacts, tasks, brands, this week and follow-ups record refs', () => {
+    const j = JSON.parse(c2.json);
+    expect(c2.refs.has('contact:c1') && c2.refs.has('task:t1') && c2.refs.has('brand:brightmill')).toBe(true);
+    expect(j.thisWeek.map((a: any) => a.ref)).toEqual(expect.arrayContaining(['task:t1', 'deliverable:x1', 'invoice:i1']));
+    expect(j.followUps.map((f: any) => f.ref)).toEqual(expect.arrayContaining(['invoice:i1', 'contact:c1']));
+  });
+
+  it('keeps only drafts of a known kind that point at a real deal, invoice or contact', () => {
+    const r = verifyReply(JSON.stringify({ answer: 'ok', drafts: [
+      { kind: 'Following up on payment', ref: 'invoice:i1' }, { kind: 'Send wire instructions', ref: 'invoice:i1' }, { kind: 'Requesting a contract', ref: 'deal:nope' }] }), c2);
+    expect(r.drafts).toEqual([expect.objectContaining({ kind: 'Following up on payment', invoiceId: 'i1', label: 'Invoice INV-1' })]);
+  });
+
+  it('allows only create_task and set_deliverable_status, with real refs and valid values', () => {
+    const r = verifyReply(JSON.stringify({ answer: 'ok', actions: [
+      { type: 'create_task', title: 'Call Dana', due: '2026-10-24', refs: ['deal:d1', 'contact:c1', 'deal:ghost'] },
+      { type: 'set_deliverable_status', ref: 'deliverable:x1', status: 'in_review' },
+      { type: 'set_deliverable_status', ref: 'deliverable:x1', status: 'deleted' },
+      { type: 'record_payment', ref: 'invoice:i1', amount: '$2,000' }, { type: 'update_invoice', ref: 'invoice:i1', amount: 1 }] }), c2);
+    expect(r.actions).toHaveLength(2);
+    expect(r.actions[0]).toMatchObject({ type: 'create_task', title: 'Call Dana', due: '2026-10-24', dealId: 'd1', contactId: 'c1' });
+    expect(r.actions[1]).toMatchObject({ type: 'set_deliverable_status', deliverableId: 'x1', status: 'in_review' });
+  });
+
+  it('drops malformed due dates and caps the number of actions', () => {
+    const many = Array.from({ length: 6 }, (_, i) => ({ type: 'create_task', title: 'T' + i, due: 'next Friday' }));
+    const r = verifyReply(JSON.stringify({ answer: 'ok', actions: many }), c2);
+    expect(r.actions).toHaveLength(3);
+    expect(r.actions.every(a => a.type === 'create_task' && a.due === null)).toBe(true);
+  });
+});

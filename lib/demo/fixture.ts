@@ -1,91 +1,130 @@
-// Fictional demo workspace. Read-only, never written to the database. All names and figures are invented.
-import type { CoreInput, Deal, Invoice, Payment, IncomeEntry, Profile } from '../types';
+// NETBYFRIDAY read-only demo workspace ("Poca Monroe"), built from design-reference/nbf-data.js.
+// Every person, brand and figure is fictional. Never written to the database; never seeded into production.
+// Cash basis holds here too: brand revenue comes only from payments on invoices; other streams are direct income entries.
+import type { CoreInput, Deal, Invoice, Payment, IncomeEntry, Profile, Contact, Task, DeliverableStatus, Stage } from '../types';
 import { lastMonths } from '../finance/core.js';
 
-const TODAY = '2026-10-22';
+export const DEMO_TODAY = '2026-11-02';
 const c = (dollars: number) => Math.round(dollars * 100);
+const STAGE: Record<string, Stage> = { Lead: 'lead', Pitching: 'pitching', Negotiating: 'negotiating', Contracted: 'contracted', 'In Progress': 'in_progress', Completed: 'completed', Paid: 'paid' };
+const DSTATUS: Record<string, DeliverableStatus> = { 'Not started': 'not_started', 'In progress': 'in_progress', 'In review': 'in_review', Approved: 'approved', Posted: 'posted', Scheduled: 'scheduled' };
+
+type RawDeal = [id: string, brand: string, agency: string, contact: string, email: string, campaign: string, fee: number, stage: string, terms: string,
+  started: string, lastContact: string, extra?: Partial<Deal> & { completed?: string; dels?: [string, string, string, string, string?][] }];
+const RAW: RawDeal[] = [
+  ['d1', 'Lumière Skin', '', 'Imani Brooks', 'imani@lumiereskin.example', 'Glow Season Launch', 9500, 'In Progress', '50% deposit, balance Net 45 after posting', '2026-09-30', '2026-10-30', {
+    description: 'Launch content for the winter serum line: one Reel, a Stories set and a TikTok.', platforms: ['Instagram', 'TikTok'], contractStatus: 'Signed Oct 9', usageRights: '60 days paid usage', exclusivity: 'No competing skincare for 45 days',
+    notes: 'Imani prefers drafts in the shared folder by Thursday.', dels: [['x1', '1 Instagram Reel', '2026-11-05', 'In review', 'Draft sent Oct 30'], ['x2', '3 Instagram Stories', '2026-11-07', 'Not started'], ['x3', '1 TikTok video', '2026-11-12', 'In progress', 'Same shoot as the Reel'], ['x4', '60 days paid usage', '2027-01-04', 'Scheduled', 'Starts on Reel post date']] }],
+  ['d2', 'Ostra Swim', 'Tidepool Talent', 'Marco Vale', 'marco@tidepool.example', "Resort '27 Lookbook", 12000, 'Negotiating', 'Net 60', '2026-10-14', '2026-10-28', {
+    description: 'Lookbook shoot plus two Reels for the resort collection.', contractStatus: 'Not sent', usageRights: 'Requested 90 days paid usage', exclusivity: 'Requested swimwear exclusivity, 60 days',
+    notes: 'They opened at $9,000. Countered at $12,000 with usage included.', dels: [['x5', 'Lookbook shoot (12 images)', '2026-12-10', 'Not started'], ['x6', '2 Instagram Reels', '2026-12-18', 'Not started']] }],
+  ['d3', 'Halcyon Hotels', '', 'Renee Park', 'renee@halcyon.example', 'Weekend in Savannah', 7500, 'Contracted', '50% deposit, balance Net 30', '2026-10-12', '2026-10-28', {
+    description: 'Hosted two-night stay with a travel Reel and carousel.', platforms: ['Instagram', 'TikTok'], contractStatus: 'Signed Oct 27', notes: 'Stay dates Nov 14–16.',
+    dels: [['x7', '1 travel Reel', '2026-11-20', 'Not started'], ['x8', '1 Instagram carousel', '2026-11-22', 'Not started']] }],
+  ['d4', 'Juniper Coffee Co.', '', 'Sam Ortiz', 'sam@junipercoffee.example', 'Morning Ritual', 2800, 'Lead', '', '2026-10-27', '2026-10-27', {
+    description: 'Inbound DM about a winter blend. Budget not shared yet.', platforms: ['TikTok'], feeIsEstimate: true, contractStatus: '', usageRights: 'Not discussed', exclusivity: 'Not discussed', notes: 'Fee is my estimate, not their offer.' }],
+  ['d5', 'Arden Athletics', '', 'Jules Hart', 'jules@arden.example', 'Holiday Gift Edit', 4500, 'Pitching', 'Net 30 proposed', '2026-10-20', '2026-10-20', {
+    description: 'Pitched a gift-guide feature with a try-on TikTok.', platforms: ['Instagram', 'TikTok'], contractStatus: '', notes: 'Pitch deck sent Oct 20. No reply yet.' }],
+  ['d6', 'Sola Haircare', '', 'Tasha Green', 'tasha@sola.example', 'Silk Press Series', 6000, 'Completed', 'Net 45', '2026-09-05', '2026-10-30', {
+    description: 'Three-part tutorial series.', platforms: ['YouTube', 'Instagram'], notes: 'Second campaign together.', completed: '2026-10-08', dels: [['x9', '3 YouTube tutorials', '2026-10-06', 'Posted']] }],
+  ['d7', 'Brightline Audio', '', 'Devin Shaw', 'devin@brightline.example', 'Studio Setup', 3800, 'Completed', 'Net 30', '2026-08-01', '2026-10-08', {
+    description: 'Desk setup video with headphones.', platforms: ['YouTube'], notes: 'Invoice sent Sep 1. Reminder sent Oct 8.', completed: '2026-08-30' }],
+  ['d8', 'Marlow & Vine', '', 'Ellis Ward', 'ellis@marlowvine.example', 'Fall Tablescape', 5200, 'Paid', 'Net 45', '2026-08-01', '2026-09-28', { description: 'Hosting Reel and carousel.', notes: 'Paid 11 days early.', completed: '2026-08-25' }],
+  ['d9', 'Lumière Skin', '', 'Imani Brooks', 'imani@lumiereskin.example', 'Summer SPF', 8000, 'Paid', 'Net 45', '2026-05-20', '2026-07-15', { description: 'Two Reels.', completed: '2026-06-10' }],
+  ['d10', 'Pell Home', '', 'Nora Pell', 'nora@pellhome.example', 'Spring Refresh', 4200, 'Paid', 'Net 30', '2026-03-01', '2026-05-10', { description: 'Bedroom refresh Reel.', notes: 'Nora mentioned a holiday collection.', completed: '2026-03-20' }],
+  ['d11', 'Fennel Market', '', 'Ari Cohen', 'ari@fennel.example', 'Holiday Hosting', 3600, 'Paid', 'Net 30', '2025-11-20', '2026-01-15', { description: 'Holiday hosting TikTok.', platforms: ['TikTok'], completed: '2025-12-12' }],
+  ['d12', 'Ostra Swim', 'Tidepool Talent', 'Marco Vale', 'marco@tidepool.example', 'Summer Capsule', 10500, 'Paid', 'Net 60', '2026-04-01', '2026-06-10', { description: 'Capsule launch shoot.', usageRights: '60 days paid', exclusivity: 'Swimwear, 30 days', completed: '2026-04-25' }],
+  ['d13', 'Sola Haircare', '', 'Tasha Green', 'tasha@sola.example', 'Wash Day', 5500, 'Paid', 'Net 45', '2026-03-15', '2026-05-30', { description: 'Wash day Reel.', completed: '2026-04-10' }]
+];
 
 export function demoData(): { input: CoreInput; profile: Profile } {
-  const del = (dealId: string, id: string, name: string, dueOn: string, status: any, notes = '') => ({ id, dealId, name, dueOn, status, notes });
-  const d = (o: Partial<Deal> & { id: string; brandName: string }): Deal => ({
-    brandId: 'b-' + o.brandName, agency: '', contactName: '', contactEmail: '', campaign: '', description: '', feeCents: 0, feeIsEstimate: false, stage: 'paid',
-    platforms: ['Instagram'], contentCategory: '', contractStatus: 'Signed', usageRights: '30 days organic', exclusivity: 'None', paymentTerms: 'Net 30', notes: '',
-    startedOn: TODAY, completedOn: null, lastContactOn: TODAY, deliverables: [], attachments: [], ...o
+  const contactId = (email: string) => 'demo-c-' + email.split('@')[0];
+  const deals: Deal[] = RAW.map(([id, brand, agency, contact, email, campaign, fee, stage, terms, started, last, x = {}]) => {
+    const { completed, dels = [], ...rest } = x;
+    return {
+      id: 'demo-' + id, brandId: 'demo-b-' + brand, brandName: brand, agency, contactName: contact, contactEmail: email, campaign, description: '', feeCents: c(fee), feeIsEstimate: false,
+      stage: STAGE[stage], platforms: ['Instagram'], contentCategory: '', contractStatus: 'Signed', usageRights: '30 days organic', exclusivity: 'None', paymentTerms: terms, notes: '',
+      startedOn: started, completedOn: completed ?? null, lastContactOn: last, contactId: contactId(email), attachments: [],
+      deliverables: dels.map(([did, name, due, status, notes = '']) => ({ id: 'demo-' + did, dealId: 'demo-' + id, name, dueOn: due, status: DSTATUS[status], notes })),
+      ...rest
+    };
   });
-  const deals: Deal[] = [
-    d({ id: 'demo-d1', brandName: 'Hearth & Field', contactName: 'Priya Shah', contactEmail: 'priya@hearthfield.example', campaign: 'Fall Harvest Series', description: 'Three-part olive oil recipe series for the fall harvest pressing.', feeCents: c(6500), stage: 'in_progress', platforms: ['Instagram', 'TikTok'], contentCategory: 'Weeknight recipe tutorials', paymentTerms: '50% on signing, 50% Net 30 after posting', exclusivity: 'No competing olive oil brands for 30 days', notes: 'Prefers drafts via shared folder.', startedOn: '2026-09-12', lastContactOn: '2026-10-19',
-      deliverables: [del('demo-d1', 'x1', '1 Instagram Reel', '2026-10-24', 'in_review', 'Draft sent Oct 19'), del('demo-d1', 'x2', '2 Instagram Stories', '2026-10-26', 'not_started'), del('demo-d1', 'x3', '1 TikTok Video', '2026-10-29', 'not_started'), del('demo-d1', 'x4', '30 days organic usage', '2026-11-28', 'scheduled')] }),
-    d({ id: 'demo-d2', brandName: 'Copperline Cookware', agency: 'Oakline Agency', contactName: 'Marcus Bell', contactEmail: 'marcus@oakline.example', campaign: 'Holiday Gifting Guide', feeCents: c(8000), stage: 'negotiating', platforms: ['Instagram', 'YouTube'], contractStatus: 'Not sent', usageRights: 'Requested 90 days paid usage', exclusivity: 'Requested 60 days category exclusivity', paymentTerms: 'Net 45', notes: 'Opened at $6,000. Countered at $8,000 including 90 days usage.', startedOn: '2026-10-06', lastContactOn: '2026-10-15' }),
-    d({ id: 'demo-d3', brandName: 'Brightmill Flour', contactName: 'Dana Ruiz', contactEmail: 'dana@brightmill.example', campaign: 'Bake Week', feeCents: c(3200), stage: 'in_progress', contentCategory: 'Baking', startedOn: '2026-09-20', lastContactOn: '2026-10-10',
-      deliverables: [del('demo-d3', 'x7', '1 Instagram Reel', '2026-10-08', 'approved'), del('demo-d3', 'x8', '3 Instagram Stories', '2026-10-09', 'approved')] }),
-    d({ id: 'demo-d4', brandName: 'Saltgrass Market', contactName: 'Elena Park', contactEmail: 'elena@saltgrass.example', campaign: 'Supper Club Presenting Sponsor', feeCents: c(4500), stage: 'contracted', contentCategory: 'Supper club & events', paymentTerms: 'Net 15 after event', startedOn: '2026-10-01', lastContactOn: '2026-10-14',
-      deliverables: [del('demo-d4', 'x9', 'Supper club event (Nov 8)', '2026-11-08', 'scheduled', '48 seats'), del('demo-d4', 'x10', '1 Instagram Reel recap', '2026-11-12', 'not_started')] }),
-    d({ id: 'demo-d5', brandName: 'Tidewater Coffee', contactName: 'Sam Ortiz', contactEmail: 'sam@tidewater.example', campaign: 'Winter blend launch', feeCents: c(2500), feeIsEstimate: true, stage: 'lead', contractStatus: '', startedOn: '2026-10-18', lastContactOn: '2026-10-18' }),
-    d({ id: 'demo-d6', brandName: 'Verde Kitchen Co.', contactName: 'Jonah Lee', contactEmail: 'jonah@verde.example', campaign: 'Meal prep containers', feeCents: c(3800), stage: 'negotiating', contractStatus: 'Sent Oct 16, awaiting signature', startedOn: '2026-10-02', lastContactOn: '2026-10-16',
-      deliverables: [del('demo-d6', 'x11', '2 TikTok Videos', '2026-11-15', 'not_started')] }),
-    d({ id: 'demo-d7', brandName: 'Northfold Spices', contactName: 'Ari Cohen', contactEmail: 'ari@northfold.example', campaign: 'Summer grilling rubs', feeCents: c(4200), stage: 'completed', contentCategory: 'Weeknight recipe tutorials', notes: 'Invoice sent Aug 28. Reminder sent Oct 2.', startedOn: '2026-07-15', completedOn: '2026-08-26', lastContactOn: '2026-10-02' }),
-    d({ id: 'demo-d8', brandName: 'Lumen Appliances', agency: 'Fieldhouse Talent', campaign: 'Countertop oven launch', feeCents: c(5500), contentCategory: 'Kitchen tools & gear', startedOn: '2026-06-10', completedOn: '2026-07-21', lastContactOn: '2026-08-20' }),
-    d({ id: 'demo-d9', brandName: 'Hearth & Field', contactName: 'Priya Shah', campaign: 'Summer Salads', feeCents: c(5000), contentCategory: 'Weeknight recipe tutorials', startedOn: '2026-05-02', completedOn: '2026-06-04', lastContactOn: '2026-06-30' }),
-    d({ id: 'demo-d10', brandName: 'Brightmill Flour', contactName: 'Dana Ruiz', campaign: 'Spring Baking', feeCents: c(2800), contentCategory: 'Baking', startedOn: '2026-03-10', completedOn: '2026-04-02', lastContactOn: '2026-05-01' }),
-    d({ id: 'demo-d11', brandName: 'Brightmill Flour', contactName: 'Dana Ruiz', campaign: 'Holiday Cookies', feeCents: c(2400), contentCategory: 'Baking', startedOn: '2025-11-15', completedOn: '2025-12-05', lastContactOn: '2026-01-06' }),
-    d({ id: 'demo-d12', brandName: 'Orchard Row Cider', contactName: 'Will Grant', campaign: 'Cider pairing dinner', feeCents: c(3600), contentCategory: 'Supper club & events', notes: 'Mentioned a spring release.', startedOn: '2025-12-20', completedOn: '2026-01-24', lastContactOn: '2026-02-05' }),
-    d({ id: 'demo-d13', brandName: 'Ferment Lab', campaign: 'Kombucha kit', feeCents: c(1500), stage: 'lost', notes: 'Offered $800 for 3 videos.', startedOn: '2026-09-02', lastContactOn: '2026-09-05' })
-  ];
-  const iv = (id: string, number: string, dealId: string | null, clientName: string, amount: number, issuedOn: string, dueOn: string, stream: any = 'brand'): Invoice =>
-    ({ id, number, dealId, clientName, description: '', stream, amountCents: c(amount), issuedOn, dueOn, terms: 'Net 30', voidedAt: null });
+
+  const iv = (number: string, deal: string | null, client: string, amount: number, issued: string, due: string, terms: string, stream: Invoice['stream'] = 'brand'): Invoice =>
+    ({ id: 'demo-' + number, number, dealId: deal ? 'demo-' + deal : null, clientName: client, description: '', stream, amountCents: c(amount), issuedOn: issued, dueOn: due, terms, voidedAt: null });
   const invoices: Invoice[] = [
-    iv('demo-i1', 'INV-1041', 'demo-d7', 'Northfold Spices', 4200, '2026-08-28', '2026-09-27'),
-    iv('demo-i2', 'INV-1042', null, 'Chicago Culinary Center', 1500, '2026-09-15', '2026-10-15', 'appearances'),
-    iv('demo-i3', 'INV-1044', 'demo-d3', 'Brightmill Flour', 3200, '2026-10-10', '2026-11-09'),
-    iv('demo-i4', 'INV-1045', 'demo-d1', 'Hearth & Field', 3250, '2026-10-01', '2026-10-31'),
-    iv('demo-i5', 'INV-1038', 'demo-d8', 'Lumen Appliances', 5500, '2026-07-21', '2026-08-20'),
-    iv('demo-i6', 'INV-1033', 'demo-d9', 'Hearth & Field', 5000, '2026-06-04', '2026-07-04'),
-    iv('demo-i7', 'INV-1030', 'demo-d10', 'Brightmill Flour', 2800, '2026-04-02', '2026-05-02'),
-    iv('demo-i8', 'INV-1027', 'demo-d11', 'Brightmill Flour', 2400, '2025-12-05', '2026-01-04'),
-    iv('demo-i9', 'INV-1029', 'demo-d12', 'Orchard Row Cider', 3600, '2026-01-24', '2026-02-08')
+    iv('INV-2041', 'd7', 'Brightline Audio', 3800, '2026-09-01', '2026-10-01', 'Net 30'),
+    iv('INV-2039', null, 'Studio Atlas Conference', 1500, '2026-09-20', '2026-11-19', 'Net 60', 'appearances'),
+    iv('INV-2044', 'd1', 'Lumière Skin', 4750, '2026-10-10', '2026-11-24', 'Net 45'),
+    iv('INV-2045', 'd6', 'Sola Haircare', 6000, '2026-10-08', '2026-11-22', 'Net 45'),
+    iv('INV-2046', 'd3', 'Halcyon Hotels', 3750, '2026-10-28', '2026-11-27', 'Net 30'),
+    iv('INV-2036', 'd8', 'Marlow & Vine', 5200, '2026-08-25', '2026-10-09', 'Net 45'),
+    iv('INV-2030', 'd9', 'Lumière Skin', 8000, '2026-06-10', '2026-07-25', 'Net 45'),
+    iv('INV-2028', 'd12', 'Ostra Swim', 10500, '2026-04-25', '2026-06-24', 'Net 60'),
+    iv('INV-2025', 'd13', 'Sola Haircare', 5500, '2026-04-10', '2026-05-25', 'Net 45'),
+    iv('INV-2020', 'd10', 'Pell Home', 4200, '2026-03-20', '2026-04-19', 'Net 30'),
+    iv('INV-2012', 'd11', 'Fennel Market', 3600, '2025-12-12', '2026-01-11', 'Net 30')
   ];
+  const pay = (n: number, inv: string, amount: number, on: string): Payment => ({ id: 'demo-p' + n, invoiceId: 'demo-' + inv, amountCents: c(amount), receivedOn: on, note: '' });
   const payments: Payment[] = [
-    { id: 'demo-p1', invoiceId: 'demo-i2', amountCents: c(500), receivedOn: '2026-10-03', note: 'Partial' },
-    { id: 'demo-p2', invoiceId: 'demo-i5', amountCents: c(5500), receivedOn: '2026-08-20', note: '' },
-    { id: 'demo-p3', invoiceId: 'demo-i6', amountCents: c(5000), receivedOn: '2026-06-30', note: '' },
-    { id: 'demo-p4', invoiceId: 'demo-i7', amountCents: c(2800), receivedOn: '2026-05-01', note: '' },
-    { id: 'demo-p5', invoiceId: 'demo-i8', amountCents: c(2400), receivedOn: '2026-01-06', note: '' },
-    { id: 'demo-p6', invoiceId: 'demo-i9', amountCents: c(3600), receivedOn: '2026-02-05', note: '' }
+    pay(1, 'INV-2045', 2000, '2026-10-30'), pay(2, 'INV-2036', 5200, '2026-09-28'), pay(3, 'INV-2030', 8000, '2026-07-15'),
+    pay(4, 'INV-2028', 10500, '2026-06-10'), pay(5, 'INV-2025', 5500, '2026-05-30'), pay(6, 'INV-2020', 4200, '2026-04-20'), pay(7, 'INV-2012', 3600, '2026-01-10')
   ];
-  // Direct (non-invoiced) income by month, Nov 2025 → Oct 2026.
-  const months = lastMonths(TODAY, 12);
+
+  // Non-invoiced income by month, Dec 2025 → Nov 2026 (November is month to date), from the design data.
+  const months = lastMonths(DEMO_TODAY, 12);
   const monthly: Record<string, number[]> = {
-    events: [2400, 3200, 0, 1800, 2200, 2600, 3000, 2400, 0, 2800, 3200, 2400],
-    digital: [1100, 2600, 900, 700, 800, 650, 700, 600, 750, 900, 1200, 700],
-    affiliate: [900, 1400, 700, 650, 700, 800, 750, 900, 850, 800, 950, 600],
-    appearances: [0, 0, 1500, 0, 0, 2000, 0, 0, 2500, 0, 0, 0],
-    brand: [1800, 1400, 0, 3000, 2400, 2000, 3500, 1000, 4500, 0, 5500, 0],
-    other: [200, 300, 150, 200, 150, 250, 200, 300, 150, 200, 250, 150]
+    affiliate: [900, 1500, 700, 800, 900, 1000, 950, 1100, 1000, 1050, 1200, 300],
+    digital: [600, 1800, 500, 450, 500, 600, 550, 700, 650, 600, 900, 150],
+    appearances: [0, 0, 2500, 0, 0, 3000, 0, 0, 2000, 0, 1500, 0],
+    events: [0, 1200, 0, 0, 1500, 0, 0, 1800, 0, 0, 2000, 0],
+    other: [200, 250, 150, 200, 150, 250, 200, 250, 150, 200, 250, 50]
   };
+  const FROM: Record<string, string> = { affiliate: 'Affiliate programs', digital: 'Preset & guide sales', appearances: 'Speaking & hosting', events: 'Creator meetups', other: 'Platform payouts' };
   const income: IncomeEntry[] = [];
   for (const [stream, arr] of Object.entries(monthly)) arr.forEach((amt, i) => {
-    if (!amt) return;
-    const day = months[i] === TODAY.slice(0, 7) ? '15' : '20';
-    income.push({ id: `demo-e-${stream}-${i}`, stream: stream as any, amountCents: c(amt), receivedOn: `${months[i]}-${day}`, counterparty: stream === 'brand' ? 'Platform creator fund' : '', description: stream === 'events' ? 'Supper club tickets' : stream === 'digital' ? 'Recipe e-book sales' : '' });
+    if (amt) income.push({ id: `demo-e-${stream}-${i}`, stream: stream as IncomeEntry['stream'], amountCents: c(amt), receivedOn: `${months[i]}-${months[i] === DEMO_TODAY.slice(0, 7) ? '01' : '18'}`, counterparty: FROM[stream], description: '' });
   });
+
+  const people = Array.from(new Map(deals.map(d => [d.contactEmail, d])).values());
+  const FOLLOW: Record<string, string> = { 'jules@arden.example': '2026-10-27', 'devin@brightline.example': '2026-11-03', 'nora@pellhome.example': '2026-11-10', 'sam@junipercoffee.example': '2026-11-02' };
+  const ROLE: Record<string, string> = { 'imani@lumiereskin.example': 'Influencer marketing lead', 'marco@tidepool.example': 'Agent, Tidepool Talent', 'renee@halcyon.example': 'Brand partnerships', 'devin@brightline.example': 'Marketing manager', 'nora@pellhome.example': 'Founder' };
+  const contacts: Contact[] = people.map(d => ({
+    id: contactId(d.contactEmail), brandId: d.brandId, brandName: d.brandName, name: d.contactName, email: d.contactEmail, role: ROLE[d.contactEmail] ?? '', phone: '', notes: '',
+    lastContactedOn: deals.filter(x => x.contactEmail === d.contactEmail).map(x => x.lastContactOn).sort().slice(-1)[0], followUpOn: FOLLOW[d.contactEmail] ?? null
+  }));
+
+  const t = (id: string, title: string, dueOn: string | null, o: Partial<Task> = {}): Task =>
+    ({ id: 'demo-t' + id, title, notes: '', dueOn, status: 'open', priority: 'normal', dealId: null, contactId: null, invoiceId: null, completedAt: null, ...o });
+  const tasks: Task[] = [
+    t('1', 'Send second payment reminder to Brightline Audio', '2026-11-03', { priority: 'high', dealId: 'demo-d7', contactId: contactId('devin@brightline.example'), invoiceId: 'demo-INV-2041' }),
+    t('2', 'Reply to Juniper Coffee with rate card', '2026-11-02', { dealId: 'demo-d4', contactId: contactId('sam@junipercoffee.example') }),
+    t('3', 'Send Ostra counter with usage terms in writing', '2026-11-04', { dealId: 'demo-d2', contactId: contactId('marco@tidepool.example') }),
+    t('4', 'Upload Glow Season Reel draft to the shared folder', '2026-11-05', { priority: 'high', dealId: 'demo-d1', contactId: contactId('imani@lumiereskin.example'), notes: 'Imani prefers drafts by Thursday.' }),
+    t('5', 'Book Savannah travel for the Halcyon stay', '2026-11-07', { dealId: 'demo-d3' }),
+    t('6', 'Pitch Pell Home on their holiday collection', '2026-11-10', { contactId: contactId('nora@pellhome.example') }),
+    t('7', 'Set aside Q4 estimated tax payment', '2027-01-15', { priority: 'low' }),
+    t('8', 'Send Sola Haircare invoice INV-2045', '2026-10-08', { status: 'done', completedAt: '2026-10-08T15:00:00Z', dealId: 'demo-d6', invoiceId: 'demo-INV-2045' })
+  ];
+
   return {
-    profile: { displayName: 'Noor Haddad', businessName: 'Noor Cooks', niche: 'Food & cooking', location: 'Chicago, IL', platforms: ['Instagram', 'TikTok', 'YouTube'], followerRange: '100k–250k',
-      revenueStreams: ['Brand partnerships', 'Events', 'Digital products', 'Affiliate', 'Appearances'], hasManager: false, businessStructure: 'LLC', priority: 'Build more predictable income', onboardingStep: 4, onboardingCompletedAt: TODAY },
+    profile: { displayName: 'Poca Monroe', businessName: 'Poca Studio LLC', niche: 'Lifestyle & beauty', location: 'Atlanta, GA', platforms: ['Instagram', 'TikTok', 'YouTube'], followerRange: '100k–250k',
+      revenueStreams: ['Brand partnerships', 'Affiliate', 'Digital products', 'Appearances'], hasManager: false, businessStructure: 'LLC', priority: 'Build more predictable income', onboardingStep: 4, onboardingCompletedAt: DEMO_TODAY },
     input: {
-      today: TODAY, deals, invoices, payments, income,
-      expenses: [['Ingredients & props', 6200], ['Event venue & staff', 9800], ['Video editor (contract)', 7200], ['Equipment', 3100], ['Software & subscriptions', 1400], ['Travel', 900]].map(([category, amt], i) => ({ id: 'demo-x' + i, category: category as string, amountCents: c(amt as number), spentOn: '2026-09-30', note: '' })),
-      goals: { monthlyCents: c(10000), annualCents: c(130000) },
+      today: DEMO_TODAY, deals, invoices, payments, income, contacts, tasks,
+      expenses: [['Editing & retouching', 6800, '2026-09-15'], ['Travel', 4200, '2026-06-20'], ['Props & wardrobe', 3900, '2026-10-05'], ['Equipment', 2600, '2026-02-11'], ['Software & subscriptions', 1100, '2026-01-03']]
+        .map(([category, amt, on], i) => ({ id: 'demo-x' + i, category: category as string, amountCents: c(amt as number), spentOn: on as string, note: '' })),
+      goals: { monthlyCents: c(10000), annualCents: c(125000) },
       opportunities: [
-        { id: 'demo-o1', name: 'Orchard Row Cider', category: 'Past brand renewal', location: 'Chicago, IL', fit: 'Paid $3,600 for a supper club pairing in January. Contact mentioned a spring release.', source: 'Your records · Cider pairing dinner', angle: 'Propose a winter pairing dinner ahead of their spring release.', status: 'new' },
-        { id: 'demo-o2', name: 'Brightmill Flour', category: 'Past brand renewal', location: '', fit: 'Three paid campaigns in 12 months, rising from $2,400 to $3,200.', source: 'Your records · 3 campaigns', angle: 'Pitch a holiday baking series instead of a single Reel.', status: 'saved' },
-        { id: 'demo-o3', name: 'Holiday supper club', category: 'Creator-led event', location: 'Chicago, IL', fit: 'Supper club ticket income recorded in 10 of the last 12 months.', source: 'Your records · events income', angle: 'Add a December date with a presenting sponsor.', status: 'new' },
-        { id: 'demo-o4', name: 'Copperline Cookware affiliate', category: 'Affiliate opportunity', location: '', fit: 'You already feature their pans in recipes.', source: 'Added by you · program terms not verified', angle: 'Ask to bundle an affiliate code into the gifting deal.', status: 'new' }
+        { id: 'demo-o1', name: 'Pell Home', category: 'Past brand renewal', location: '', fit: 'Paid $4,200 in April, on time. Nora mentioned a holiday collection.', source: 'Your records · Spring Refresh', angle: 'Pitch a holiday guest-room refresh before mid-November.', status: 'new' },
+        { id: 'demo-o2', name: 'Fennel Market', category: 'Past brand renewal', location: 'Atlanta, GA', fit: 'Holiday Hosting TikTok last December, paid within Net 30.', source: 'Your records · Holiday Hosting', angle: 'Offer a repeat holiday hosting series with a Stories add-on.', status: 'saved' },
+        { id: 'demo-o3', name: 'Studio Atlas Conference', category: 'Speaking opportunity', location: 'Atlanta, GA', fit: 'You spoke at their September panel ($1,500).', source: 'Your records · INV-2039', angle: 'Ask about the spring lineup once the current invoice is paid.', status: 'new' },
+        { id: 'demo-o4', name: 'Lumière Skin affiliate program', category: 'Affiliate opportunity', location: '', fit: 'Two campaigns with Lumière. Affiliate is your second-largest stream.', source: 'Added by you · program terms not verified', angle: 'Ask to add an affiliate code to the Glow Season content.', status: 'new' }
       ],
-      audience: [['Instagram', [78100, 84200], 4.1, 38000], ['TikTok', [104000, 126000], 5.6, 61000], ['YouTube', [17200, 21400], 3.2, 14500]].flatMap(([platform, [a, b], eng, views]: any) => [
-        { id: `demo-a-${platform}-0`, platform, followers: a, engagementRate: eng, avgViews: views, capturedOn: '2025-11-01' },
-        { id: `demo-a-${platform}-1`, platform, followers: Math.round((a + b) / 2), engagementRate: eng, avgViews: views, capturedOn: '2026-05-01' },
-        { id: `demo-a-${platform}-2`, platform, followers: b, engagementRate: eng, avgViews: views, capturedOn: '2026-10-20' }]),
-      categories: [{ id: 'demo-c1', name: 'Weeknight recipe tutorials', avgViews: 72000, posts: 42 }, { id: 'demo-c2', name: 'Supper club & events', avgViews: 29000, posts: 18 }, { id: 'demo-c3', name: 'Baking', avgViews: 51000, posts: 20 }, { id: 'demo-c4', name: 'Kitchen tools & gear', avgViews: 34000, posts: 12 }]
+      audience: ([['Instagram', 118000, 142000, 4.6, 52000], ['TikTok', 71000, 98000, 6.1, 64000], ['YouTube', 18100, 24000, 3.4, 17500]] as [string, number, number, number, number][]).flatMap(([platform, a, b, eng, views]) => [
+        { id: `demo-a-${platform}-0`, platform, followers: a, engagementRate: eng, avgViews: views, capturedOn: '2025-12-01' },
+        { id: `demo-a-${platform}-1`, platform, followers: b, engagementRate: eng, avgViews: views, capturedOn: '2026-10-30' }]),
+      categories: []
     }
   };
 }
