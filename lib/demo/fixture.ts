@@ -1,7 +1,7 @@
 // NETBYFRIDAY read-only demo workspace ("Jordan Lee", a fictional creator), built from design-reference/nbf-data.js.
 // Every person, brand and figure is fictional. Never written to the database; never seeded into production.
 // Cash basis holds here too: brand revenue comes only from payments on invoices; other streams are direct income entries.
-import type { CoreInput, Deal, Invoice, Payment, IncomeEntry, Profile, Contact, Task, DeliverableStatus, Stage } from '../types';
+import type { CoreInput, Deal, Invoice, Payment, IncomeEntry, Profile, Contact, Task, DeliverableStatus, Stage, Contract } from '../types';
 import { lastMonths } from '../finance/core.js';
 
 export const DEMO_TODAY = '2026-11-02';
@@ -37,7 +37,7 @@ const RAW: RawDeal[] = [
   ['d13', 'Sola Haircare', '', 'Tasha Green', 'tasha@sola.example', 'Wash Day', 5500, 'Paid', 'Net 45', '2026-03-15', '2026-05-30', { description: 'Wash day Reel.', completed: '2026-04-10' }]
 ];
 
-export function demoData(): { input: CoreInput; profile: Profile } {
+export function demoData(): { input: CoreInput; profile: Profile; contracts: Contract[]; paymentDetails: string } {
   const contactId = (email: string) => 'demo-c-' + email.split('@')[0];
   const deals: Deal[] = RAW.map(([id, brand, agency, contact, email, campaign, fee, stage, terms, started, last, x = {}]) => {
     const { completed, dels = [], ...rest } = x;
@@ -107,7 +107,26 @@ export function demoData(): { input: CoreInput; profile: Profile } {
     t('8', 'Send Sola Haircare invoice INV-2045', '2026-10-08', { status: 'done', completedAt: '2026-10-08T15:00:00Z', dealId: 'demo-d6', invoiceId: 'demo-INV-2045' })
   ];
 
+  // Contracts (shown only when the contracts flag is on). Fictional terms for the fictional demo creator.
+  const k = (o: Partial<Contract>): Contract => ({ id: '', dealId: null, status: 'confirmed', title: '', fileName: '', hasFile: false, brandName: '', feeCents: null, paymentTerms: '', signedOn: null,
+    usageRights: '', usageStartsOn: null, usageEndsOn: null, exclusivity: '', exclusivityStartsOn: null, exclusivityEndsOn: null, whitelisting: '', revisions: '', killFee: '', otherTerms: '',
+    extracted: null, confirmedAt: '2026-10-01T12:00:00Z', createdAt: '2026-10-01T12:00:00Z', ...o });
+  const contracts: Contract[] = [
+    k({ id: 'demo-k1', dealId: 'demo-d1', title: 'Glow Season Launch agreement', fileName: 'Lumiere_GlowSeason_Agreement.pdf', brandName: 'Lumière Skin', feeCents: 950000,
+      paymentTerms: '50% deposit on signing, balance Net 45 after posting', signedOn: '2026-09-30',
+      usageRights: 'Paid social on Instagram and TikTok, brand handles only', usageStartsOn: '2026-10-05', usageEndsOn: '2026-12-03',
+      exclusivity: 'No competing skincare partnerships', exclusivityStartsOn: '2026-09-30', exclusivityEndsOn: '2026-11-14',
+      whitelisting: 'Allowed for 60 days with prior approval of ad copy', revisions: 'Up to 2 rounds per deliverable', killFee: '50% of the fee if cancelled after signing' }),
+    k({ id: 'demo-k2', dealId: 'demo-d3', title: 'Weekend in Savannah creator agreement', fileName: 'Halcyon_Savannah_SOW.pdf', brandName: 'Halcyon Hotels', feeCents: 750000,
+      paymentTerms: '50% deposit, balance Net 30', signedOn: '2026-10-14',
+      usageRights: 'Organic reposting on brand channels', usageStartsOn: '2026-11-20', usageEndsOn: '2027-05-20',
+      exclusivity: 'No competing hotel brands in Savannah', exclusivityStartsOn: '2026-11-14', exclusivityEndsOn: '2026-12-31', revisions: '1 round' }),
+    k({ id: 'demo-k3', dealId: 'demo-d9', title: 'Summer SPF agreement', fileName: 'Lumiere_SummerSPF.pdf', brandName: 'Lumière Skin', feeCents: 800000, paymentTerms: 'Net 45', signedOn: '2026-05-20',
+      usageRights: 'Paid social, 90 days', usageStartsOn: '2026-06-10', usageEndsOn: '2026-09-08', exclusivity: 'Sunscreen category', exclusivityStartsOn: '2026-05-20', exclusivityEndsOn: '2026-07-20' })
+  ];
+
   return {
+    contracts, paymentDetails: 'Bank transfer (ACH) or PayPal. Details sent on request. Please include the invoice number.',
     profile: { displayName: 'Jordan Lee', businessName: 'Jordan Lee Studio LLC', niche: 'Lifestyle & beauty', location: 'Austin, TX', platforms: ['Instagram', 'TikTok', 'YouTube'], followerRange: '100k–250k',
       revenueStreams: ['Brand partnerships', 'Affiliate', 'Digital products', 'Appearances'], hasManager: false, businessStructure: 'LLC', priority: 'Build more predictable income', onboardingStep: 4, onboardingCompletedAt: DEMO_TODAY },
     input: {

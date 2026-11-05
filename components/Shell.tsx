@@ -11,14 +11,17 @@ import { markNotificationsRead, setDemoMode } from '@/app/(app)/actions';
 
 // V1 workspace navigation. Flagged screens (Insights, Opportunities, Audience) appear only when their flag is on.
 const NAV: (readonly [string, string])[] = [
-  ['/overview', 'Dashboard'], ['/partnerships', 'Partnerships'], ['/content', 'Content'], ['/money', 'Invoices & Revenue'], ['/contacts', 'Brands & Contacts'], ['/tasks', 'Tasks'], ['/advisor', 'AI Advisor'],
+  ['/overview', 'Dashboard'], ['/partnerships', 'Partnerships'], ['/content', 'Content'], ['/money', 'Invoices & Revenue'],
+  ...(flag('contracts') ? [['/contracts', 'Contracts'] as const] : []),
+  ...(flag('taxes') ? [['/taxes', 'Taxes'] as const] : []),
+  ['/contacts', 'Brands & Contacts'], ['/tasks', 'Tasks'], ['/advisor', 'AI Advisor'],
   ...(flag('insights') ? [['/intelligence', 'Insights'] as const] : []),
   ...(flag('opportunities') ? [['/opportunities', 'Opportunities'] as const] : []),
   ...(flag('audience') ? [['/audience', 'Audience'] as const] : []),
   ['/settings', 'Settings']
 ];
 const MOBILE = [['/overview', 'Home'], ['/partnerships', 'Deals'], ['/money', 'Money'], ['/tasks', 'Tasks']] as const;
-const MORE = ['/content', '/contacts', '/advisor', '/intelligence', '/opportunities', '/audience', '/settings'];
+const MORE = ['/content', '/contracts', '/taxes', '/contacts', '/advisor', '/intelligence', '/opportunities', '/audience', '/settings'];
 
 type Notif = { key: string; type: string; text: string; href: string; unread: boolean };
 

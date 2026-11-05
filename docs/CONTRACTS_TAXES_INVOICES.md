@@ -1,0 +1,38 @@
+# Contracts, Taxes and sendable invoices (built, not live)
+
+Three features built on the branch `feature/contracts-taxes-invoices`. Each is behind a flag and invisible until a deployment turns it on.
+
+| Feature | Flag | Where |
+|---|---|---|
+| Contract upload + AI-read terms | `contracts` | `/contracts`, `/contracts/[id]` |
+| Taxes (cash-basis set-aside, estimated-tax periods, 1099 check, CSV for an accountant) | `taxes` | `/taxes` |
+| Sendable invoices (private link + "Open in my email") | `invoiceLinks` | Send button on Invoices & Revenue, public page `/i/[token]` |
+
+## How each one stays inside the rules
+
+- **Contracts.** The PDF is stored privately (`attachments` bucket, `{workspace_id}/contracts/...`). The AI proposes terms in a contract marked **review**, each with the contract wording it came from. For pasted text, every quote is checked against the text and flagged if it isn't there. The fee is parsed from the quoted wording by `parseMoneyToCents`, and end dates are computed by the engine (`addDays`), never by the model. Nothing changes on a partnership until the creator clicks **Confirm**, which runs through the normal server action (`saveContract`). Confirming can create or update a partnership, add deliverables, and add reminder tasks a week before usage rights or exclusivity end. It never creates invoices or payments. Contract reading counts toward the per-user hourly AI cap. If the AI is unavailable, the contract is saved for manual entry.
+- **Taxes.** Every number comes from `taxYear()` in `lib/finance/core.js`. It is cash basis: payments + direct income received in the year, minus recorded expenses. The set-aside uses a percentage the creator picks (default 25%). Periods and due dates follow IRS Form 1040-ES; dates are listed only for verified years (2025, 2026), and other years say "Check IRS.gov". The 1099-NEC threshold is $600 through 2025 and $2,000 from 2026. Every screen is labelled as planning, not tax advice.
+- **Invoices.** netbyfriday still sends no email. **Send** creates a private link (an unguessable token on the invoice) and opens the creator's own email app with the message filled in. The brand opens `/i/[token]` without signing in. That page reads exactly one invoice through the `shared_invoice()` security-definer function, and voided invoices never show. **Turn off link** clears the token, which kills the old link. Payment instructions are free text the creator writes.
+
+## Database
+
+Migration `20261107000001_contracts_taxes_invoice_links.sql`:
+- `contracts` table with RLS.
+- `workspaces.tax_set_aside_pct`, `invoice_payment_details` and `invoice_email`, with column grants.
+- `invoices.share_token`, `sent_at` and `bill_to_email`.
+- The `shared_invoice(uuid)` function, executable by `anon`.
+- The `ai_usage.kind` constraint now also allows `'contract'`.
+
+`rls_isolation.test.sql` covers contract isolation and token-only invoice reads (plan 29).
+
+## Going live (when the founder says so)
+
+1. Merge the branch to `main`. The `staging-db` workflow applies the migration. It is additive, and the flags are still off.
+2. In Vercel → Settings → Environment Variables, set `NEXT_PUBLIC_NBF_FLAGS` to include `contracts,taxes,invoiceLinks` (comma separated; keep any existing flags). Redeploy.
+3. PDF reading needs `AI_PROVIDER=anthropic` with a model that reads PDFs (current Claude models do). With an OpenAI-compatible provider, creators can still paste contract text.
+4. Run the Live tests workflow. The new e2e spec skips itself on deployments where a flag is off.
+
+## Not included (ask first)
+
+- **App-sent email.** It needs an email service (for example Resend) and SPF/DKIM records on netbyfriday.com. Both are on the "don't build" list in `CLAUDE.md` today.
+- **Word (.docx) contracts.** They need a document parser dependency. Today the app asks creators to save as PDF.

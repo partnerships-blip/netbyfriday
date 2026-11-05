@@ -2,11 +2,40 @@
 // It answers the way the real model is instructed to: JSON whose facts cite refs and amounts copied from <records>.
 // This tests NETBYFRIDAY's own pipeline (RLS load → context → verification → history), not model quality.
 import http from 'node:http';
+import fs from 'node:fs';
+
+// Contract reading stand-in: pulls terms out of the document text with fixed patterns and copies the wording as the quote,
+// the shape the real model is told to use. PDFs can't be read here, so a PDF upload is answered from the sample contract.
+const SAMPLE = fs.readFileSync(new URL('./fixtures/sample-contract.txt', import.meta.url), 'utf8');
+function readContract(text) {
+  const fields = {}, grab = (key, re, value = m => m[1] ?? m[0]) => { const m = text.match(re); if (m) fields[key] = { value: value(m), quote: m[0].trim() }; };
+  grab('title', /AGREEMENT:\s*(.+)/);
+  grab('brandName', /between ([A-Z][\w&' ]+?(?: Co\.| Inc\.)?) \("Brand"\)/);
+  grab('fee', /total fee of (\$[\d,]+(?:\.\d\d)?)/);
+  grab('paymentTerms', /50% of the fee is due within 15 days of signing\. The balance is due Net 30 after the final deliverable goes live\./, () => '50% within 15 days of signing; balance Net 30 after the final deliverable goes live');
+  grab('signedOn', /both parties sign, (\d{4}-\d{2}-\d{2})/);
+  grab('usageRights', /paid social advertising on Meta \(Instagram, Facebook\) and TikTok for 90 days from the first post date/, () => 'Paid social on Meta and TikTok, plus organic reposting');
+  grab('usageDays', /for (90) days from the first post date/, m => 90);
+  grab('whitelisting', /run the deliverables as partnership ads or Spark Ads[^.]*/, () => 'Partnership ads / Spark Ads during the usage period, ad copy approved by you');
+  grab('exclusivity', /not enter paid partnerships with competing color cosmetics brands/, () => 'No paid partnerships with competing color cosmetics brands');
+  grab('exclusivityDays', /for (30) days after the final deliverable goes live/, m => 30);
+  grab('revisions', /up to two rounds of revisions per deliverable/, () => 'Up to 2 rounds per deliverable');
+  grab('killFee', /Brand will pay 50% of the fee as a kill fee/, () => '50% of the fee if the brand cancels after signing');
+  grab('otherTerms', /Brand will review drafts within 3 business days/, () => 'Brand reviews drafts within 3 business days; disclose with #ad or the paid partnership label');
+  const deliverables = [...text.matchAll(/\(([a-z])\) (.+?), live by (\d{4}-\d{2}-\d{2})/g)].map(m => ({ name: m[2].replace(/ with link sticker/, '').replace(/^(\w+) \((\d+)\) /, '$2 '), dueOn: m[3], quote: m[0].slice(4) }));
+  return JSON.stringify({ fields, deliverables, warnings: ['Usage starts on the first post date, which the contract doesn’t give. Add it once you post.'] });
+}
+
 http.createServer((req, res) => {
   let body = '';
   req.on('data', c => (body += c));
   req.on('end', () => {
     const { system, messages = [] } = JSON.parse(body || '{}');
+    if (String(system).startsWith('You read brand partnership contracts')) {
+      const doc = messages[0]?.content?.[0];
+      res.writeHead(200, { 'content-type': 'application/json' });
+      return res.end(JSON.stringify({ content: [{ type: 'text', text: readContract(doc?.source?.type === 'text' ? doc.source.data : SAMPLE) }] }));
+    }
     const question = String(messages[messages.length - 1]?.content ?? '');
     const send = text => { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ content: [{ type: 'text', text }] })); };
     if (system.startsWith('You write short business emails')) return send('Subject: Quick follow-up on the invoice\n\nHi [Name],\n\nJust checking in on the open balance. Thank you!\n\nAvery');

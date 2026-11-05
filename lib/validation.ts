@@ -76,3 +76,36 @@ export const TaskSchema = z.object({
   dealId: optId, contactId: optId, invoiceId: optId
 });
 export const TaskPatchSchema = TaskSchema.partial().extend({ id: uuid, status: z.enum(TASK_STATUS).optional() });
+
+// ---------- contracts, taxes, invoice links ----------
+const optDateNull = z.union([z.literal(''), isoDate]).default('').transform(v => v || null);
+export const ContractSchema = z.object({
+  id: uuid,
+  confirm: z.boolean().default(false),
+  title: req('Title', 200), brandName: text(160).default(''),
+  fee: z.union([z.literal(''), z.string(), z.number()]).default('').transform((v, ctx) => {
+    if (v === '') return null;
+    const c = parseMoneyToCents(v);
+    if (c === null) { ctx.addIssue({ code: 'custom', message: 'Fee must be an amount like 9500 or 9,500.00.' }); return z.NEVER; }
+    return c;
+  }),
+  paymentTerms: text(200).default(''), signedOn: optDateNull,
+  usageRights: text(1000).default(''), usageStartsOn: optDateNull, usageEndsOn: optDateNull,
+  exclusivity: text(1000).default(''), exclusivityStartsOn: optDateNull, exclusivityEndsOn: optDateNull,
+  whitelisting: text(500).default(''), revisions: text(500).default(''), killFee: text(500).default(''), otherTerms: text(5000).default(''),
+  // What confirming does: link to a partnership (existing or new), add deliverables, add reminder tasks.
+  link: z.discriminatedUnion('mode', [
+    z.object({ mode: z.literal('none') }),
+    z.object({ mode: z.literal('existing'), dealId: uuid, updateFee: z.boolean().default(false) }),
+    z.object({ mode: z.literal('new'), campaign: text(200).default('') })
+  ]).default({ mode: 'none' }),
+  deliverables: z.array(z.object({ name: req('Deliverable', 200), dueOn: isoDate })).max(20).default([]),
+  reminders: z.boolean().default(true)
+}).superRefine((v, ctx) => {
+  if (v.usageStartsOn && v.usageEndsOn && v.usageEndsOn < v.usageStartsOn) ctx.addIssue({ code: 'custom', message: 'Usage end date is before its start date.', path: ['usageEndsOn'] });
+  if (v.exclusivityStartsOn && v.exclusivityEndsOn && v.exclusivityEndsOn < v.exclusivityStartsOn) ctx.addIssue({ code: 'custom', message: 'Exclusivity end date is before its start date.', path: ['exclusivityEndsOn'] });
+  if (v.confirm && v.link.mode === 'new' && !v.brandName) ctx.addIssue({ code: 'custom', message: 'Add the brand name to create a partnership.', path: ['brandName'] });
+});
+export const TaxSettingsSchema = z.object({ pct: z.coerce.number().int('Use a whole percentage.').min(0).max(60, 'Use 60% or less.') });
+export const InvoiceSettingsSchema = z.object({ paymentDetails: text(1000).default(''), email });
+export const ShareInvoiceSchema = z.object({ id: uuid, billToEmail: email.default('') });

@@ -8,6 +8,8 @@ import * as S from '@/lib/validation';
 import { track } from '@/lib/analytics';
 import { ensureBrand } from '@/lib/data/brands';
 import type { ActionResult } from '@/lib/types';
+import { flag } from '@/lib/flags';
+import { addDays, shortDate } from '@/lib/finance/core.js';
 
 type Ctx = Awaited<ReturnType<typeof requireWritable>>;
 async function run(fn: (c: Ctx) => Promise<string | void>, message?: string): Promise<ActionResult> {
@@ -296,4 +298,98 @@ export async function submitFeedback(raw: unknown) {
     ok(await sb.from('feedback').insert({ user_id: user.id, kind: v.kind, message: v.message, page: v.page, contact_ok: v.contactOk, user_agent: '' }));
     return { ok: true, message: 'Thanks. Your note was sent to the beta team.' } as ActionResult;
   } catch (e) { return { ok: false, error: friendlyError(e) } as ActionResult; }
+}
+
+// ---------- contracts (flag: contracts) ----------
+// The AI only proposes terms (saved on the contract in "review"). This is the creator's own save/confirm, through the same
+// rules as every other action. Confirming can link a partnership, add deliverables and reminder tasks; it never touches
+// invoices, payments or revenue.
+export async function saveContract(raw: unknown) {
+  return run(async c => {
+    if (!flag('contracts')) throw new UserError('Contracts are not available yet.');
+    const v = S.ContractSchema.parse(raw);
+    const cur = ok(await c.sb.from('contracts').select('id,status,deal_id').eq('id', v.id).eq('workspace_id', c.ws.id).single());
+    const today = todayIn(c.ws.timezone);
+    const row: Record<string, unknown> = {
+      title: v.title, brand_name: v.brandName, fee_cents: v.fee, payment_terms: v.paymentTerms, signed_on: v.signedOn,
+      usage_rights: v.usageRights, usage_starts_on: v.usageStartsOn, usage_ends_on: v.usageEndsOn,
+      exclusivity: v.exclusivity, exclusivity_starts_on: v.exclusivityStartsOn, exclusivity_ends_on: v.exclusivityEndsOn,
+      whitelisting: v.whitelisting, revisions: v.revisions, kill_fee: v.killFee, other_terms: v.otherTerms
+    };
+    if (v.confirm && cur.status !== 'confirmed') {
+      let dealId: string | null = cur.deal_id;
+      const terms = { usage_rights: v.usageRights.slice(0, 500), exclusivity: v.exclusivity.slice(0, 500), payment_terms: v.paymentTerms, contract_status: 'Signed' };
+      if (v.link.mode === 'new') {
+        const brand_id = await ensureBrand(c, v.brandName);
+        dealId = ok(await c.sb.from('deals').insert({ workspace_id: c.ws.id, brand_id, campaign: v.link.campaign || v.title, fee_cents: v.fee ?? 0, stage: 'contracted',
+          started_on: v.signedOn ?? today, last_contact_on: today, ...terms }).select('id').single()).id;
+      } else if (v.link.mode === 'existing') {
+        const patch: Record<string, unknown> = { ...terms };
+        if (v.link.updateFee && v.fee !== null) patch.fee_cents = v.fee;
+        dealId = ok(await c.sb.from('deals').update(patch).eq('id', v.link.dealId).eq('workspace_id', c.ws.id).select('id').single()).id;
+      }
+      if (v.deliverables.length) {
+        if (!dealId) throw new UserError('Link the contract to a partnership to add its deliverables.');
+        ok(await c.sb.from('deliverables').insert(v.deliverables.map(d => ({ workspace_id: c.ws.id, deal_id: dealId, name: d.name, due_on: d.dueOn }))));
+      }
+      if (v.reminders) {
+        const who = v.brandName || v.title;
+        const tasks = ([['Usage rights end', v.usageEndsOn], ['Exclusivity ends', v.exclusivityEndsOn]] as const)
+          .filter(([, end]) => end && end >= today)
+          .map(([what, end]) => ({ workspace_id: c.ws.id, deal_id: dealId, title: `${what} ${shortDate(end!)}: ${who}`.slice(0, 200),
+            notes: what === 'Usage rights end' ? 'Check whether the brand is still running your content, and offer a renewal if they want more time.' : 'You can pitch competing brands in this category after this date.',
+            due_on: addDays(end!, -7) < today ? today : addDays(end!, -7), priority: 'normal' }));
+        if (tasks.length) ok(await c.sb.from('tasks').insert(tasks));
+      }
+      Object.assign(row, { status: 'confirmed', confirmed_at: new Date().toISOString(), deal_id: dealId });
+    }
+    ok(await c.sb.from('contracts').update(row).eq('id', v.id).eq('workspace_id', c.ws.id).select('id').single());
+    return v.id;
+  }, 'Contract saved');
+}
+export async function deleteContract(id: string) {
+  return run(async c => {
+    if (!flag('contracts')) throw new UserError('Contracts are not available yet.');
+    const cur = ok(await c.sb.from('contracts').select('storage_path').eq('id', S.uuid.parse(id)).eq('workspace_id', c.ws.id).single());
+    ok(await c.sb.from('contracts').delete().eq('id', id).eq('workspace_id', c.ws.id));
+    if (cur.storage_path) await c.sb.storage.from('attachments').remove([cur.storage_path]);
+  }, 'Contract deleted');
+}
+
+// ---------- taxes (flag: taxes) ----------
+export async function saveTaxSettings(raw: unknown) {
+  return run(async c => {
+    const v = S.TaxSettingsSchema.parse(raw);
+    ok(await c.sb.from('workspaces').update({ tax_set_aside_pct: v.pct }).eq('id', c.ws.id).select('id').single());
+  }, 'Set-aside updated');
+}
+
+// ---------- invoice links (flag: invoiceLinks) ----------
+export async function saveInvoiceSettings(raw: unknown) {
+  return run(async c => {
+    const v = S.InvoiceSettingsSchema.parse(raw);
+    ok(await c.sb.from('workspaces').update({ invoice_payment_details: v.paymentDetails, invoice_email: v.email }).eq('id', c.ws.id).select('id').single());
+  }, 'Invoice details saved');
+}
+/** Creates (or reuses) the invoice's private link. Returns the token. */
+export async function shareInvoice(raw: unknown) {
+  return run(async c => {
+    if (!flag('invoiceLinks')) throw new UserError('Invoice links are not available yet.');
+    const v = S.ShareInvoiceSchema.parse(raw);
+    const cur = ok(await c.sb.from('invoices').select('share_token,voided_at').eq('id', v.id).eq('workspace_id', c.ws.id).single());
+    if (cur.voided_at) throw new UserError('A voided invoice cannot be sent.');
+    const token = cur.share_token ?? crypto.randomUUID();
+    ok(await c.sb.from('invoices').update({ share_token: token, bill_to_email: v.billToEmail }).eq('id', v.id).eq('workspace_id', c.ws.id).select('id').single());
+    return token;
+  });
+}
+export async function markInvoiceSent(id: string) {
+  return run(async c => {
+    ok(await c.sb.from('invoices').update({ sent_at: new Date().toISOString() }).eq('id', S.uuid.parse(id)).eq('workspace_id', c.ws.id).select('id').single());
+  }, 'Marked as sent');
+}
+export async function stopSharingInvoice(id: string) {
+  return run(async c => {
+    ok(await c.sb.from('invoices').update({ share_token: null }).eq('id', S.uuid.parse(id)).eq('workspace_id', c.ws.id).select('id').single());
+  }, 'Link turned off. The old link no longer works.');
 }
