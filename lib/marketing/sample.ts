@@ -1,6 +1,6 @@
 import 'server-only';
 // Everything the public site shows about "a creator's business" is calculated here, by the real engine, from the fictional
-// Poca demo workspace. Nothing on the site is a hand-typed figure.
+// Demo workspace (fictional creator "Jordan Lee"). Nothing on the site is a hand-typed figure.
 import { demoData } from '../demo/fixture';
 import { compute, formatCents, monthLabel, shortDate, STAGES } from '../finance/core.js';
 import { STAGE_LABEL } from '../brand';

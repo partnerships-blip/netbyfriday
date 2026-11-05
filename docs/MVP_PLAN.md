@@ -163,10 +163,10 @@ See §2.
 - Engine: `termsDays`, task counts, 8-week buckets and terms statistics, with 4 new unit tests (34 total). The export includes contacts and tasks.
 - Fixed: "Received" on a brand and in the partnership drawer now counts payments on invoices billed to that brand by name, not only invoices linked to a partnership. It matches the payment history shown beside it.
 - E2E: add a contact; link it from the Table view; add a task from the partnership; check the task appears in the Tasks table, calendar and board, on the contact, and on the dashboard; check the deliverable appears on Content; check the invoice calendar and terms panel; check another creator's export has no contacts or tasks.
-- **Moved to M3:** the Poca demo fixture, so it is built together with the Advisor evaluation set that uses it.
+- **Moved to M3:** the demo fixture, so it is built together with the Advisor evaluation set that uses it.
 
 ### M3 — Advisor as the daily operator ✅ (November 4, 2026)
-- **Demo workspace:** "Poca Monroe", built from `design-reference/nbf-data.js` (`lib/demo/fixture.ts`), with contacts and tasks. Read-only and never written to the database. A unit test checks it is internally consistent.
+- **Demo workspace:** "Jordan Lee" (fictional; the founder's name appears only on /about), built from `design-reference/nbf-data.js` (`lib/demo/fixture.ts`), with contacts and tasks. Read-only and never written to the database. A unit test checks it is internally consistent.
 - **Engine:**
   - `agenda` (this week): tasks, deliverables and invoices due in the next 7 days, plus anything overdue.
   - `followUps`: overdue invoices, unanswered inquiries, unanswered pitches, quiet negotiations, and contacts with follow-up dates.
@@ -195,7 +195,7 @@ See §2.
   - `/` is rebuilt from `NETBYFRIDAY Website.dc.html`: hero with a working product preview, terms ticker, problem cards, six feature cards with live mini-interfaces, How it works, interactive NET45 timeline, business intelligence, Advisor sample, pricing, FAQ, final call to action and footer.
   - Also `/pricing`, `/waitlist`, `/privacy` and `/terms`.
   - Signed-in visitors see "Open your workspace" in the nav.
-- **No hand-typed figures.** Every number on the site comes from `lib/marketing/sample.ts`, which runs the real engine on the fictional Poca demo data. The Advisor section shows pre-written sample answers built the same way; there is no public AI endpoint.
+- **No hand-typed figures.** Every number on the site comes from `lib/marketing/sample.ts`, which runs the real engine on the fictional demo data. The Advisor section shows pre-written sample answers built the same way; there is no public AI endpoint.
 - **Plans** come from `lib/billing/plans.ts` and are always shown with "Illustrative plans · pricing is not final". Every call to action goes to the waitlist.
 - **Privacy and terms** are plain-language drafts that describe what the beta actually does. They are clearly marked for legal review, with bracketed items to confirm.
 - **Migration `20261106000001_waitlist.sql`:**

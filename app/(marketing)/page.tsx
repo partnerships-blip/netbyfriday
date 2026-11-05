@@ -136,7 +136,7 @@ export default function Home() {
       <section id="story" className={`${wrap} ${sec}`}><Reveal>
         <div className="grid items-start gap-10 min-[860px]:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
           <div>
-            <div className={eyebrow}>{story.byline || 'Our story'}</div>
+            <div className={eyebrow}>Our story</div>
             <h2 className={`${h2} mt-3`}>Built by a creator who still sends the invoices.</h2>
           </div>
           <div className="flex flex-col gap-5 text-[18px] leading-[1.7] text-[#4A2A45]">

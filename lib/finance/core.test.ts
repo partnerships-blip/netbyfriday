@@ -195,7 +195,7 @@ describe('workspace records (M2)', () => {
   });
 });
 
-describe('Poca demo workspace (read-only fixture)', async () => {
+describe('Demo workspace (read-only fixture)', async () => {
   const { demoData } = await import('../demo/fixture');
   const m: any = compute(demoData().input);
   it('is internally consistent: every payment matches an invoice, no ledger issues', () => {

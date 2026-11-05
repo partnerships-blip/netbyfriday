@@ -115,8 +115,8 @@ A rebranded version of the original Creator Intelligence prototype, with NETBYFR
 
 There is also onboarding (account, profile, goals, import) and a "← Website" link in the header. The Audience screen still exists in the code but is no longer in the main navigation.
 
-### Sample business ("Poca")
-All fictional. Poca Monroe, Poca Studio LLC, lifestyle and beauty creator in Atlanta, about 142k Instagram, 98k TikTok and 24k YouTube followers. The demo date is November 2, 2026.
+### Sample business ("Jordan Lee")
+All fictional. Jordan Lee, Jordan Lee Studio LLC, lifestyle and beauty creator in Austin, about 142k Instagram, 98k TikTok and 24k YouTube followers. The demo date is November 2, 2026.
 - 13 partnerships across all stages with fictional brands (Lumière Skin, Ostra Swim, Halcyon Hotels, Juniper Coffee Co., Arden Athletics, Sola Haircare, Brightline Audio, Marlow & Vine, Pell Home, Fennel Market).
 - 10 invoices on NET30/45/60 terms, including one overdue (Brightline Audio, INV-2041), one partially paid (Sola Haircare), and several due in November.
 - 12 months of revenue by type, expenses, a $10,000 monthly / $125,000 annual goal, four opportunities and audience numbers.
@@ -204,7 +204,7 @@ You asked me to decide; these are my recommendations, not yet built:
 |---|---|
 | `NETBYFRIDAY Website.dc.html` | Marketing website prototype |
 | `NETBYFRIDAY Dashboard.dc.html` | Dashboard demo prototype |
-| `nbf-data.js` | Poca sample data (fictional) |
+| `nbf-data.js` | Sample data (fictional) |
 | `nbf-compute.js` | Calculation engine: totals, insights, NET-term stats, expected cash, recent activity |
 | `nbf-actions.js` | Demo state, browser saving, AI calls |
 | `uploads/` | Your original visual mockup |

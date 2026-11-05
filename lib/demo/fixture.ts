@@ -1,4 +1,4 @@
-// NETBYFRIDAY read-only demo workspace ("Poca Monroe"), built from design-reference/nbf-data.js.
+// NETBYFRIDAY read-only demo workspace ("Jordan Lee", a fictional creator), built from design-reference/nbf-data.js.
 // Every person, brand and figure is fictional. Never written to the database; never seeded into production.
 // Cash basis holds here too: brand revenue comes only from payments on invoices; other streams are direct income entries.
 import type { CoreInput, Deal, Invoice, Payment, IncomeEntry, Profile, Contact, Task, DeliverableStatus, Stage } from '../types';
@@ -108,7 +108,7 @@ export function demoData(): { input: CoreInput; profile: Profile } {
   ];
 
   return {
-    profile: { displayName: 'Poca Monroe', businessName: 'Poca Studio LLC', niche: 'Lifestyle & beauty', location: 'Atlanta, GA', platforms: ['Instagram', 'TikTok', 'YouTube'], followerRange: '100k–250k',
+    profile: { displayName: 'Jordan Lee', businessName: 'Jordan Lee Studio LLC', niche: 'Lifestyle & beauty', location: 'Austin, TX', platforms: ['Instagram', 'TikTok', 'YouTube'], followerRange: '100k–250k',
       revenueStreams: ['Brand partnerships', 'Affiliate', 'Digital products', 'Appearances'], hasManager: false, businessStructure: 'LLC', priority: 'Build more predictable income', onboardingStep: 4, onboardingCompletedAt: DEMO_TODAY },
     input: {
       today: DEMO_TODAY, deals, invoices, payments, income, contacts, tasks,
@@ -117,8 +117,8 @@ export function demoData(): { input: CoreInput; profile: Profile } {
       goals: { monthlyCents: c(10000), annualCents: c(125000) },
       opportunities: [
         { id: 'demo-o1', name: 'Pell Home', category: 'Past brand renewal', location: '', fit: 'Paid $4,200 in April, on time. Nora mentioned a holiday collection.', source: 'Your records · Spring Refresh', angle: 'Pitch a holiday guest-room refresh before mid-November.', status: 'new' },
-        { id: 'demo-o2', name: 'Fennel Market', category: 'Past brand renewal', location: 'Atlanta, GA', fit: 'Holiday Hosting TikTok last December, paid within Net 30.', source: 'Your records · Holiday Hosting', angle: 'Offer a repeat holiday hosting series with a Stories add-on.', status: 'saved' },
-        { id: 'demo-o3', name: 'Studio Atlas Conference', category: 'Speaking opportunity', location: 'Atlanta, GA', fit: 'You spoke at their September panel ($1,500).', source: 'Your records · INV-2039', angle: 'Ask about the spring lineup once the current invoice is paid.', status: 'new' },
+        { id: 'demo-o2', name: 'Fennel Market', category: 'Past brand renewal', location: 'Austin, TX', fit: 'Holiday Hosting TikTok last December, paid within Net 30.', source: 'Your records · Holiday Hosting', angle: 'Offer a repeat holiday hosting series with a Stories add-on.', status: 'saved' },
+        { id: 'demo-o3', name: 'Studio Atlas Conference', category: 'Speaking opportunity', location: 'Austin, TX', fit: 'You spoke at their September panel ($1,500).', source: 'Your records · INV-2039', angle: 'Ask about the spring lineup once the current invoice is paid.', status: 'new' },
         { id: 'demo-o4', name: 'Lumière Skin affiliate program', category: 'Affiliate opportunity', location: '', fit: 'Two campaigns with Lumière. Affiliate is your second-largest stream.', source: 'Added by you · program terms not verified', angle: 'Ask to add an affiliate code to the Glow Season content.', status: 'new' }
       ],
       audience: ([['Instagram', 118000, 142000, 4.6, 52000], ['TikTok', 71000, 98000, 6.1, 64000], ['YouTube', 18100, 24000, 3.4, 17500]] as [string, number, number, number, number][]).flatMap(([platform, a, b, eng, views]) => [

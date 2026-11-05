@@ -1,4 +1,4 @@
-// AI Advisor evaluation: 20 questions against the read-only Poca demo workspace, answered by the REAL model on a deployed site.
+// AI Advisor evaluation: 20 questions against the read-only demo workspace (fictional creator Jordan Lee), answered by the REAL model on a deployed site.
 // Expected numbers come from lib/finance/core.js run on the same fixture, never typed by hand.
 // Hard rules (fail the run): no parse errors; no wrong number marked Verified; no financial changes proposed.
 // Soft score: at least 18 of 20 questions must meet their expectations.
@@ -67,7 +67,7 @@ async function enterDemo(page: Page) {
   await expect(page.getByText('Demo · fictional data')).toBeVisible();
 }
 
-test('advisor evaluation on the Poca demo workspace', async ({ page }) => {
+test('advisor evaluation on the demo workspace', async ({ page }) => {
   test.skip(!process.env.E2E_REAL_AI, 'Runs only against a deployed site with the real AI provider (E2E_REAL_AI=1).');
   test.setTimeout(20 * 60_000);
   await enterDemo(page);
