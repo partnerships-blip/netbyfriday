@@ -61,7 +61,7 @@ export function Shell({ children, brandName, logoUrl, initials, name, business, 
         <div className="mt-auto flex flex-col gap-3">
           <div className="flex flex-col gap-2 rounded-xl border border-line bg-white p-3">
             <div className="font-mono text-[10px] uppercase tracking-[.08em] text-muted">{demo ? 'Demo mode' : 'My workspace'}</div>
-            <div className="text-[13px] leading-snug">{demo ? 'Fictional data for a sample food creator. Read-only.' : 'Only the records you have added.'}</div>
+            <div className="text-[13px] leading-snug">{demo ? 'Fictional data for a sample creator. Read-only.' : 'Only the records you have added.'}</div>
             <button onClick={switchMode} className="h-[30px] rounded-lg border border-line2 bg-bg text-[13px]">{demo ? 'Switch to my workspace' : 'View the demo'}</button>
           </div>
           <div className="flex items-center gap-2.5 px-1.5 py-1">
