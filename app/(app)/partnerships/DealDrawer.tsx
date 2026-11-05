@@ -9,7 +9,7 @@ import { DraftModal, type DraftTarget } from '@/components/DraftModal';
 import { dealFields } from '@/components/forms';
 import { useAction, toast } from '@/components/Toaster';
 import { addDeliverable, updateDeliverable, deleteDeliverable, updateDeal, deleteDeal } from '@/app/(app)/actions';
-import { STAGES, formatCents, shortDate } from '@/lib/finance/core.js';
+import { STAGES, formatCents, shortDate, dealOutstanding } from '@/lib/finance/core.js';
 import { DELIVERABLE_LABEL } from '@/lib/brand';
 import type { Contact, Deal, Stage, Task } from '@/lib/types';
 import Link from 'next/link';
@@ -19,7 +19,7 @@ import type { InvoiceLite } from './Board';
 const DTONE: Record<string, any> = { not_started: 'neutral', in_progress: 'accent', in_review: 'warn', approved: 'ok', posted: 'ok', scheduled: 'neutral' };
 const DRAFTS = ['Following up on an unanswered proposal', 'Requesting a contract', 'Following up on payment', 'Reconnecting with a previous partner', 'Proposing a new campaign'];
 
-export function DealDrawer({ deal, allDeals, contacts = [], tasks = [], invoices, received, onClose, onMove, readOnly, today }: { deal: Deal | null; allDeals: Deal[]; contacts?: Contact[]; tasks?: Task[]; invoices: InvoiceLite[]; received: Record<string, number>; onClose: () => void; onMove: (id: string, s: Stage) => void; readOnly: boolean; today: string }) {
+export function DealDrawer({ deal, allDeals, contacts = [], tasks = [], invoices, received, onClose, onMove, onSettle, readOnly, today }: { onSettle?: (id: string) => void; deal: Deal | null; allDeals: Deal[]; contacts?: Contact[]; tasks?: Task[]; invoices: InvoiceLite[]; received: Record<string, number>; onClose: () => void; onMove: (id: string, s: Stage) => void; readOnly: boolean; today: string }) {
   const router = useRouter();
   const [pending, run] = useAction();
   const [editing, setEditing] = useState(false);
@@ -51,6 +51,15 @@ export function DealDrawer({ deal, allDeals, contacts = [], tasks = [], invoices
           <span className="text-xs text-muted">{deal.feeIsEstimate ? 'Your estimate, not an offer' : 'Agreed fee · not revenue until paid'}</span>
           {!readOnly && <Btn size="sm" className="ml-auto" onClick={() => setEditing(true)}>Edit details</Btn>}
         </div>
+        {deal.stage === 'paid' && (() => {
+          const out = dealOutstanding(deal, invoices.filter(v => v.dealId === deal.id));
+          if (out.known ? out.totalCents === 0 : (received[deal.id] || 0) > 0) return null;
+          return (
+            <div className="flex flex-wrap items-center gap-3 rounded-[12px] border border-[#E8D9A8] bg-[#FBF6E6] p-3.5 text-[13px] text-[#5C4410]">
+              <span className="min-w-0 flex-1">Marked Paid, but {out.known ? `${formatCents(out.totalCents)} isn’t recorded yet` : 'no payment is recorded yet'}. Revenue counts only recorded payments.</span>
+              {!readOnly && onSettle && <Btn size="sm" variant="primary" onClick={() => onSettle(deal.id)}>{out.known ? `Record ${formatCents(out.totalCents)} received` : 'Record payment'}</Btn>}
+            </div>);
+        })()}
         {deal.description && <p className="text-[15px] leading-relaxed text-[#4A2A45]">{deal.description}</p>}
         <dl className="grid grid-cols-1 gap-px overflow-hidden rounded-xl border border-soft bg-soft sm:grid-cols-2">
           {facts.map(([k, v]) => <div key={k} className="flex flex-col gap-0.5 bg-white px-3 py-2.5"><dt className="text-[11px] text-muted">{k}</dt><dd className="break-words text-sm leading-snug">{v || '—'}</dd></div>)}

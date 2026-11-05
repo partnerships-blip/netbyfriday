@@ -5,7 +5,7 @@ import { Btn, cx } from '@/components/ui';
 import { FormModal } from '@/components/FormModal';
 import { dealFields } from '@/components/forms';
 import { toast } from '@/components/Toaster';
-import { createDeal, moveDeal } from '@/app/(app)/actions';
+import { createDeal, moveDeal, recordDealPayment } from '@/app/(app)/actions';
 import { STAGES, formatCents, shortDate, daysBetween } from '@/lib/finance/core.js';
 import { DealDrawer } from './DealDrawer';
 import type { Contact, Deal, Stage, Task } from '@/lib/types';
@@ -25,14 +25,25 @@ export function Board({ deals: initial, invoices, received, summary, initialDeal
   useEffect(() => setDeals(initial), [initial]);
   useEffect(() => { if (initialDeal) setSel(initialDeal); }, [initialDeal]);
 
+  // When the records can't tell how much was received (estimated or $0 fee), ask once.
+  const [askAmount, setAskAmount] = useState<{ id: string; mode: 'move' | 'settle' } | null>(null);
   const move = (id: string, stage: Stage) => {
     if (readOnly) return toast('Demo mode is read-only.');
     const prev = deals;
     setDeals(ds => ds.map(d => (d.id === id ? { ...d, stage } : d)));
     start(async () => {
       const r = await moveDeal({ id, stage });
-      if (!r.ok) { setDeals(prev); toast(r.error, 'error'); return; }
-      toast(stage === 'paid' ? 'Moved to Paid. Revenue counts only recorded payments, so record the payment on its invoice.' : 'Stage updated');
+      if (!r.ok) { setDeals(prev); if (r.error === 'NEEDS_AMOUNT') setAskAmount({ id, mode: 'move' }); else toast(r.error, 'error'); return; }
+      toast(r.message ?? 'Stage updated');
+      router.refresh();
+    });
+  };
+  const settle = (id: string) => {
+    if (readOnly) return toast('Demo mode is read-only.');
+    start(async () => {
+      const r = await recordDealPayment({ id });
+      if (!r.ok) { if (r.error === 'NEEDS_AMOUNT') setAskAmount({ id, mode: 'settle' }); else toast(r.error, 'error'); return; }
+      toast(r.message ?? 'Payment recorded');
       router.refresh();
     });
   };
@@ -88,7 +99,16 @@ export function Board({ deals: initial, invoices, received, summary, initialDeal
         )} />
       <p className="text-xs text-muted">Drag cards between stages on desktop, or open a card to change its stage.</p>
       <FormModal open={adding} onClose={() => setAdding(false)} title="New partnership" fields={dealFields} initial={{ stage: 'lead' }} submitLabel="Add partnership" action={async v => { const r = await createDeal(v); if (r.ok) router.refresh(); return r; }} />
-      <DealDrawer deal={selected} allDeals={deals} contacts={contacts} tasks={tasks} invoices={invoices} received={received} onClose={() => { setSel(null); router.replace('/partnerships', { scroll: false }); }} onMove={move} readOnly={readOnly} today={today} />
+      <DealDrawer deal={selected} allDeals={deals} contacts={contacts} tasks={tasks} invoices={invoices} received={received} onClose={() => { setSel(null); router.replace('/partnerships', { scroll: false }); }} onMove={move} onSettle={settle} readOnly={readOnly} today={today} />
+      {askAmount && <FormModal open onClose={() => setAskAmount(null)} title="How much did you receive?"
+        note="This partnership has an estimated or $0 fee, so enter what was actually paid. It’s recorded as a payment and counts as revenue."
+        fields={[{ name: 'amount', label: 'Amount received ($)', type: 'money', required: true }, { name: 'receivedOn', label: 'Date received', type: 'date', required: true }]}
+        initial={{ receivedOn: today }} submitLabel={askAmount.mode === 'move' ? 'Mark Paid and record' : 'Record payment'}
+        action={async v => {
+          const r = askAmount.mode === 'move' ? await moveDeal({ id: askAmount.id, stage: 'paid', ...v }) : await recordDealPayment({ id: askAmount.id, ...v });
+          if (r.ok) { toast(r.message ?? 'Recorded'); setAskAmount(null); router.refresh(); }
+          return r;
+        }} />}
     </div>
   );
 }

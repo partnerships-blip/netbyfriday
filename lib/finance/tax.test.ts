@@ -86,3 +86,24 @@ describe('contract windows', () => {
     expect(w.map(x => x.state)).toEqual(['upcoming', 'open']);
   });
 });
+
+import { dealOutstanding } from './core.js';
+describe('marking a partnership Paid', () => {
+  it('records open invoice balances plus any agreed fee never invoiced', () => {
+    expect(dealOutstanding({ feeCents: 500000, feeIsEstimate: false }, [{ amountCents: 300000, paidCents: 100000 }]))
+      .toEqual({ openInvoiceCents: 200000, uninvoicedCents: 200000, totalCents: 400000, known: true });
+  });
+  it('a deal with no invoices records its whole fee', () => {
+    expect(dealOutstanding({ feeCents: 380000, feeIsEstimate: false }, []).totalCents).toBe(380000);
+  });
+  it('nothing left when everything is paid', () => {
+    expect(dealOutstanding({ feeCents: 380000, feeIsEstimate: false }, [{ amountCents: 380000, paidCents: 380000 }])).toMatchObject({ totalCents: 0, known: true });
+  });
+  it('an estimated fee is never treated as money received: the creator must give the amount', () => {
+    expect(dealOutstanding({ feeCents: 500000, feeIsEstimate: true }, [])).toMatchObject({ totalCents: 0, known: false });
+    expect(dealOutstanding({ feeCents: 0, feeIsEstimate: false }, [])).toMatchObject({ totalCents: 0, known: false });
+  });
+  it('ignores voided invoices', () => {
+    expect(dealOutstanding({ feeCents: 200000, feeIsEstimate: false }, [{ amountCents: 200000, paidCents: 0, voided: true }]).uninvoicedCents).toBe(200000);
+  });
+});

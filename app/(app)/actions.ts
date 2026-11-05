@@ -9,7 +9,7 @@ import { track } from '@/lib/analytics';
 import { ensureBrand } from '@/lib/data/brands';
 import type { ActionResult } from '@/lib/types';
 import { flag } from '@/lib/flags';
-import { addDays, shortDate } from '@/lib/finance/core.js';
+import { addDays, shortDate, dealOutstanding, formatCents } from '@/lib/finance/core.js';
 
 type Ctx = Awaited<ReturnType<typeof requireWritable>>;
 async function run(fn: (c: Ctx) => Promise<string | void>, message?: string): Promise<ActionResult> {
@@ -39,6 +39,7 @@ export async function createDeal(raw: unknown) {
     const today = todayIn(c.ws.timezone);
     const row = ok(await c.sb.from('deals').insert({ ...dealRow(v), workspace_id: c.ws.id, brand_id, started_on: v.startedOn ?? today, last_contact_on: v.lastContactOn ?? today, completed_on: ['completed', 'paid'].includes(v.stage) ? today : null }).select('id').single());
     await track(c, 'deal_created');
+    if (v.stage === 'paid') await settleIfKnown(c, row.id, today);
     return row.id;
   }, 'Partnership added');
 }
@@ -47,20 +48,89 @@ export async function updateDeal(raw: unknown) {
     const v = S.DealPatchSchema.parse(raw);
     const patch = dealRow(v);
     if (v.brand) patch.brand_id = await ensureBrand(c, v.brand);
+    const before = v.stage === 'paid' ? ok(await c.sb.from('deals').select('stage').eq('id', v.id).eq('workspace_id', c.ws.id).single()).stage : null;
     ok(await c.sb.from('deals').update(patch).eq('id', v.id).eq('workspace_id', c.ws.id).select('id').single());
+    if (v.stage === 'paid' && before !== 'paid') await settleIfKnown(c, v.id, todayIn(c.ws.timezone));
   }, 'Partnership updated');
 }
-export async function moveDeal(raw: unknown) {
-  return run(async c => {
+/** Saving a deal as Paid from a form records the money when the amount is known; otherwise the partnership asks for it. */
+async function settleIfKnown(c: Ctx, dealId: string, today: string) {
+  try { await settleDeal(c, dealId, today); } catch (e) { if (!(e instanceof UserError && e.message === 'NEEDS_AMOUNT')) throw e; }
+}
+/**
+ * Records the money for a partnership the creator has marked Paid (their own action, through the normal ledger rules):
+ * pays off each open invoice on the deal, and invoices + pays any agreed fee that was never invoiced.
+ * When the records can't tell the amount (estimated or $0 fee), `amount` must come from the creator.
+ * Returns the cents recorded.
+ */
+async function settleDeal(c: Ctx, dealId: string, receivedOn: string, amount?: number) {
+  const deal = ok(await c.sb.from('deals').select('id,brand_id,campaign,fee_cents,fee_is_estimate').eq('id', dealId).eq('workspace_id', c.ws.id).single());
+  const { data: invs } = await c.sb.from('invoices').select('id,amount_cents,voided_at,stream').eq('workspace_id', c.ws.id).eq('deal_id', dealId);
+  const live = (invs ?? []).filter(v => !v.voided_at);
+  const { data: pays } = live.length ? await c.sb.from('payments').select('invoice_id,amount_cents').eq('workspace_id', c.ws.id).in('invoice_id', live.map(v => v.id)) : { data: [] as any[] };
+  const paid = new Map<string, number>();
+  for (const p of pays ?? []) paid.set(p.invoice_id, (paid.get(p.invoice_id) ?? 0) + Number(p.amount_cents));
+  const out = dealOutstanding({ feeCents: Number(deal.fee_cents), feeIsEstimate: deal.fee_is_estimate }, live.map(v => ({ amountCents: Number(v.amount_cents), paidCents: paid.get(v.id) ?? 0 })));
+  if (!out.known && amount === undefined) throw new UserError('NEEDS_AMOUNT');
+  const note = 'Recorded when the partnership was marked Paid';
+  let recorded = 0;
+  // 1) Pay off open invoices (oldest first). With an explicit amount, stop when it runs out.
+  let budget = amount ?? Infinity;
+  for (const v of live) {
+    const bal = Number(v.amount_cents) - (paid.get(v.id) ?? 0);
+    const pay = Math.min(bal, budget);
+    if (pay <= 0) continue;
+    ok(await c.sb.from('payments').insert({ workspace_id: c.ws.id, invoice_id: v.id, amount_cents: pay, received_on: receivedOn, note }));
+    recorded += pay; budget -= pay;
+  }
+  // 2) Whatever is left (the never-invoiced part of the fee, or the creator's stated amount) gets an invoice and a payment.
+  const rest = amount !== undefined ? amount - recorded : out.uninvoicedCents;
+  if (rest > 0) {
+    const { data: brand } = await c.sb.from('brands').select('name').eq('id', deal.brand_id).eq('workspace_id', c.ws.id).single();
+    const { data: nums } = await c.sb.from('invoices').select('number').eq('workspace_id', c.ws.id);
+    const next = Math.max(1000, ...(nums ?? []).map(n => Number(String(n.number).replace(/\D/g, '')) || 0)) + 1;
+    const inv = ok(await c.sb.from('invoices').insert({ workspace_id: c.ws.id, number: 'INV-' + next, deal_id: deal.id, client_name: brand?.name || 'Client',
+      description: (deal.campaign || 'Brand partnership').slice(0, 2000), stream: 'brand', amount_cents: rest, issued_on: receivedOn, due_on: receivedOn, terms: 'Paid' }).select('id').single());
+    ok(await c.sb.from('payments').insert({ workspace_id: c.ws.id, invoice_id: inv.id, amount_cents: rest, received_on: receivedOn, note }));
+    recorded += rest;
+  }
+  if (recorded > 0) await track(c, 'payment_recorded');
+  return recorded;
+}
+const paidMessage = (cents: number, on: string, today: string) =>
+  cents > 0 ? `Marked Paid. ${formatCents(cents)} recorded as received ${on === today ? 'today' : shortDate(on)}.` : 'Marked Paid. Everything was already recorded.';
+
+export async function moveDeal(raw: unknown): Promise<ActionResult> {
+  try {
+    const c = await requireWritable();
     const v = S.MoveDealSchema.parse(raw);
     const today = todayIn(c.ws.timezone);
+    const cur = ok(await c.sb.from('deals').select('stage,completed_on').eq('id', v.id).eq('workspace_id', c.ws.id).single());
+    let recorded = 0;
+    if (v.stage === 'paid' && cur.stage !== 'paid') recorded = await settleDeal(c, v.id, v.receivedOn ?? today, v.amount);
     const patch: Record<string, unknown> = { stage: v.stage };
-    if (v.stage === 'completed' || v.stage === 'paid') {
-      const cur = ok(await c.sb.from('deals').select('completed_on').eq('id', v.id).eq('workspace_id', c.ws.id).single());
-      if (!cur.completed_on) patch.completed_on = today;
-    }
+    if ((v.stage === 'completed' || v.stage === 'paid') && !cur.completed_on) patch.completed_on = today;
     ok(await c.sb.from('deals').update(patch).eq('id', v.id).eq('workspace_id', c.ws.id).select('id').single());
-  }, 'Stage updated');
+    revalidatePath('/', 'layout');
+    return { ok: true, message: v.stage === 'paid' && cur.stage !== 'paid' ? paidMessage(recorded, v.receivedOn ?? today, today) : 'Stage updated' } as ActionResult;
+  } catch (e) {
+    if (e instanceof UserError && e.message === 'NEEDS_AMOUNT') return { ok: false, error: 'NEEDS_AMOUNT' } as ActionResult;
+    return { ok: false, error: friendlyError(e) };
+  }
+}
+/** For a deal already marked Paid whose money isn't recorded yet. */
+export async function recordDealPayment(raw: unknown): Promise<ActionResult> {
+  try {
+    const c = await requireWritable();
+    const v = S.SettleDealSchema.parse(raw);
+    const today = todayIn(c.ws.timezone);
+    const recorded = await settleDeal(c, v.id, v.receivedOn ?? today, v.amount);
+    revalidatePath('/', 'layout');
+    return { ok: true, message: paidMessage(recorded, v.receivedOn ?? today, today).replace('Marked Paid. ', '') } as ActionResult;
+  } catch (e) {
+    if (e instanceof UserError && e.message === 'NEEDS_AMOUNT') return { ok: false, error: 'NEEDS_AMOUNT' } as ActionResult;
+    return { ok: false, error: friendlyError(e) };
+  }
 }
 export async function deleteDeal(id: string) {
   return run(async c => {

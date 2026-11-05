@@ -34,7 +34,15 @@ export const DealSchema = z.object({
   startedOn: isoDate.optional(), lastContactOn: isoDate.optional(), contactId: z.union([uuid, z.literal('')]).optional()
 });
 export const DealPatchSchema = DealSchema.partial().extend({ id: uuid, contactId: z.union([uuid, z.literal('')]).optional() });
-export const MoveDealSchema = z.object({ id: uuid, stage: z.enum(STAGE_KEYS) });
+// Moving to Paid records the money. `amount` is only needed when the records can't tell (estimated or $0 fee).
+export const MoveDealSchema = z.object({ id: uuid, stage: z.enum(STAGE_KEYS), receivedOn: isoDate.optional(),
+  amount: z.union([z.literal(''), z.undefined(), z.string(), z.number()]).transform((v, ctx) => {
+    if (v === '' || v === undefined) return undefined;
+    const c = parseMoneyToCents(v);
+    if (c === null || c <= 0) { ctx.addIssue({ code: 'custom', message: 'Enter the amount you received, like 3800 or 3,800.00.' }); return z.NEVER; }
+    return c;
+  }) });
+export const SettleDealSchema = MoveDealSchema.omit({ stage: true });
 
 export const DeliverableSchema = z.object({ dealId: uuid, name: req('Deliverable', 200), dueOn: isoDate, status: z.enum(DELIVERABLE_KEYS).default('not_started'), notes: text(2000).default('') });
 export const DeliverablePatchSchema = z.object({ id: uuid, name: req('Deliverable', 200).optional(), dueOn: isoDate.optional(), status: z.enum(DELIVERABLE_KEYS).optional(), notes: text(2000).optional() });
