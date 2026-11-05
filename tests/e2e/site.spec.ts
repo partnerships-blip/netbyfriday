@@ -23,8 +23,10 @@ test.describe.serial('public site and waitlist', () => {
     for (const p of ['/pricing', '/privacy', '/terms']) { await page.goto(p); await expect(page.getByRole('heading', { level: 1 })).toBeVisible(); }
     await expect(page.getByRole('link', { name: 'hello@netbyfriday.com' }).first()).toBeVisible();      // contact address on legal pages
     await page.goto('/about');
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('The Story Behind NETBYFRIDAY');
-    await expect(page.getByText(/processed by Friday/)).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1 })).toHaveAccessibleName('The Story Behind NETBYFRIDAY');
+    await expect(page.getByRole('img', { name: /Poca, founder/ })).toBeVisible();                     // founder portrait
+    await expect(page.getByText(/processed by Friday/).first()).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: 'The business behind the content' })).toBeVisible();   // chapters
     await expect(page.locator('blockquote', { hasText: 'how much money I was owed' })).toBeVisible();
   });
 
