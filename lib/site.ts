@@ -9,5 +9,5 @@ export const SITE = {
   name: 'netbyfriday',
   tagline: 'The business behind being booked.',
   url: normalizeSiteUrl(process.env.NEXT_PUBLIC_SITE_URL),
-  contactEmail: (process.env.NEXT_PUBLIC_CONTACT_EMAIL || 'partnerships@saypoca.com').trim()
+  contactEmail: (process.env.NEXT_PUBLIC_CONTACT_EMAIL || 'hello@netbyfriday.com').trim()
 };

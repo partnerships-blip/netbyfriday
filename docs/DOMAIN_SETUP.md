@@ -15,6 +15,6 @@ DNS stays at GoDaddy. Vercel serves the site and issues the HTTPS certificate au
 5. Point the app at the domain:
    - **Vercel → Settings → Environment Variables:** set `NEXT_PUBLIC_SITE_URL` = `https://netbyfriday.com`, then redeploy.
    - **Supabase → Authentication → URL Configuration:** Site URL `https://netbyfriday.com`; Redirect URLs add `https://netbyfriday.com/auth/callback` (keep the vercel.app one while testing).
-6. Optional: `NEXT_PUBLIC_CONTACT_EMAIL` sets the address shown on the site and legal pages (default `partnerships@saypoca.com`).
+6. Optional: `NEXT_PUBLIC_CONTACT_EMAIL` sets the address shown on the site and legal pages (default `hello@netbyfriday.com`).
 
 Later (M6), auth emails (password reset, confirmations) should come from a custom SMTP sender on this domain; that needs SPF/DKIM TXT records added at GoDaddy.

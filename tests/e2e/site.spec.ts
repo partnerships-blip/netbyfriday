@@ -19,7 +19,13 @@ test.describe.serial('public site and waitlist', () => {
     await expect(page.locator('#advisor').getByText(new RegExp(`${formatCents(m.outstandingCents).replace('$', '\\$')} across ${m.openInvoices.length} invoices`))).toBeVisible();
     await expect(page.getByText('Illustrative plans · pricing is not final').first()).toBeVisible();
     await expect(page.getByText('does not control when brands pay').first()).toBeVisible();
+    await expect(page.getByRole('link', { name: /Read the full story/ })).toBeVisible();           // founder story excerpt
     for (const p of ['/pricing', '/privacy', '/terms']) { await page.goto(p); await expect(page.getByRole('heading', { level: 1 })).toBeVisible(); }
+    await expect(page.getByRole('link', { name: 'hello@netbyfriday.com' }).first()).toBeVisible();      // contact address on legal pages
+    await page.goto('/about');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('The Story Behind NETBYFRIDAY');
+    await expect(page.getByText(/processed by Friday/)).toBeVisible();
+    await expect(page.locator('blockquote', { hasText: 'how much money I was owed' })).toBeVisible();
   });
 
   const email = `waitlist-${stamp}@e2e.test`;

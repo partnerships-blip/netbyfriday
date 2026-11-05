@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { Wordmark } from '../Brand';
 
-const LINKS = [['Product', '/#product'], ['How it works', '/#how'], ['Solutions', '/#net45'], ['Pricing', '/pricing'], ['FAQ', '/#faq']];
+const LINKS = [['Product', '/#product'], ['How it works', '/#how'], ['Solutions', '/#net45'], ['Pricing', '/pricing'], ['Our story', '/about']];
 export function Nav({ signedIn }: { signedIn: boolean }) {
   const [open, setOpen] = useState(false);
   return (

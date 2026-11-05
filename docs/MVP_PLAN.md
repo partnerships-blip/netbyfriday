@@ -210,7 +210,9 @@ See §2.
   - The home page's figures match the engine; hero tabs, the NET45 timeline and the Advisor sample work; the pricing label is present.
   - Waitlist join and duplicate handling.
   - Locally: the admin invite flow, checking the code works exactly once.
-- **Domain:** `docs/DOMAIN_SETUP.md` (GoDaddy DNS → Vercel). Waiting on the founder.
+- **Founder story:** `/about` ("Our story") in Poca's own words, kept verbatim in `content/founder-story.ts`. The home page shows an excerpt and pull quote.
+- **Contact address:** hello@netbyfriday.com (`NEXT_PUBLIC_CONTACT_EMAIL` overrides it).
+- **Domain:** netbyfriday.com connected by the founder (GoDaddy DNS → Vercel, `docs/DOMAIN_SETUP.md`).
 
 ### M5 — Paid beta billing (3–4 days, only when the paid beta starts)
 - Stripe Checkout, Customer Portal, and one webhook (signature-verified, idempotent).

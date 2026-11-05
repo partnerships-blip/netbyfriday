@@ -8,6 +8,7 @@ import { AdvisorDemo } from '@/components/marketing/AdvisorDemo';
 import { Reveal } from '@/components/marketing/Reveal';
 import { PricingCards } from '@/components/marketing/PricingCards';
 import { DELIVERABLE_LABEL } from '@/lib/brand';
+import { founderStory } from '@/lib/marketing/story';
 
 const sec = 'py-[clamp(72px,10vw,136px)]', wrap = 'mx-auto max-w-[1240px] px-6';
 const h2 = 'text-[clamp(38px,5vw,68px)] font-extrabold leading-none tracking-[-.045em] text-balance';
@@ -25,6 +26,10 @@ const FAQ: [string, string][] = [
 
 export default function Home() {
   const s = siteSample();
+  const story = founderStory();
+  const quote = story.blocks.find(b => b.kind === 'quote')?.text ?? '';
+  const why = story.blocks.find(b => b.text.startsWith('The name itself'))?.text ?? '';
+  const friday = story.blocks.find(b => b.text.includes('processed by Friday'))?.text ?? '';
   const roles = [
     { role: 'The talent', line: 'Shoots, edits, posts. Repeat.', chips: ['Reel due Thursday', '3 deliverables this week'], cls: 'bg-white', chip: 'bg-[#F3EEF4]' },
     { role: 'The negotiator', line: 'Rates live in a notes app.', chips: ['Counter at $12,000?', 'Is 90 days of usage extra?'], cls: 'bg-lavender', chip: 'bg-white' },
@@ -117,6 +122,20 @@ export default function Home() {
         <p className="mt-5 max-w-[720px] text-[18px] leading-relaxed text-[#4A2A45]">Answers come from your own records, with the numbers shown and suggestions labeled as suggestions. Nothing is ever sent or changed without your approval.</p>
         <div className="mt-10"><AdvisorDemo samples={s.advisor} /></div>
       </Reveal></div></section>
+
+      <section id="story" className={`${wrap} ${sec}`}><Reveal>
+        <div className="grid items-start gap-10 min-[860px]:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+          <div>
+            <div className={eyebrow}>{story.byline || 'Our story'}</div>
+            <h2 className={`${h2} mt-3`}>Built by a creator who still sends the invoices.</h2>
+          </div>
+          <div className="flex flex-col gap-5 text-[18px] leading-[1.7] text-[#4A2A45]">
+            <blockquote className="rounded-[24px] bg-plum px-7 py-6 text-[clamp(22px,2.4vw,28px)] font-extrabold leading-snug tracking-[-.03em] text-bg">{quote}</blockquote>
+            <p>{why}</p><p>{friday}</p>
+            <Link href="/about" className="w-fit text-[16px] font-bold underline underline-offset-4">Read the full story →</Link>
+          </div>
+        </div>
+      </Reveal></section>
 
       <section id="pricing" className={`${wrap} ${sec}`}><Reveal>
         <div className={eyebrow}>Pricing</div>
