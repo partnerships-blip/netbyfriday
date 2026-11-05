@@ -71,3 +71,22 @@ test.describe.serial('public site and waitlist', () => {
     }
   });
 });
+
+// Headlines use tight leading; a highlight bar must start below the line above it, never paint over its letters.
+test('highlight bars never cover the headline line above them', async ({ page }) => {
+  for (const width of [1440, 390]) for (const path of ['/', '/pricing', '/waitlist']) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto(path);
+    const gap = await page.evaluate(() => {
+      const hl = document.querySelector('h1 .nbf-hl') as HTMLElement | null;
+      if (!hl) return null;
+      const r = document.createRange(); r.selectNodeContents(hl.parentElement!.firstChild!);
+      const top = hl.getBoundingClientRect().top;
+      // lines of the headline that sit above the bar (when the bar shares a line with text, skip that line)
+      const above = [...r.getClientRects()].filter(x => (x.top + x.bottom) / 2 < top);
+      return above.length ? top - Math.max(...above.map(x => x.bottom)) : Infinity;
+    });
+    expect(gap, `${path} @${width}px: no highlight found`).not.toBeNull();
+    expect(gap!, `${path} @${width}px`).toBeGreaterThanOrEqual(-0.5);
+  }
+});

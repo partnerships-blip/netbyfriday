@@ -1,13 +1,15 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { Modal } from './Modal';
 import { Btn, Field, Select, Textarea } from './ui';
 import { useAction } from './Toaster';
 import { submitFeedback } from '@/app/(app)/actions';
 
-export function FeedbackButton() {
+// openRequest: bump it to open the form from elsewhere (the mobile More menu).
+export function FeedbackButton({ openRequest = 0 }: { openRequest?: number }) {
   const [open, setOpen] = useState(false);
+  useEffect(() => { if (openRequest) setOpen(true); }, [openRequest]);
   const [kind, setKind] = useState<'feedback' | 'bug'>('feedback');
   const [message, setMessage] = useState('');
   const [contactOk, setContactOk] = useState(false);
@@ -15,7 +17,9 @@ export function FeedbackButton() {
   const page = usePathname();
   return (
     <>
-      <button onClick={() => setOpen(true)} className="fixed bottom-20 right-4 z-30 h-9 rounded-full border border-line2 bg-white px-4 text-[13px] font-medium shadow-sm hover:border-ink md:bottom-5">Feedback</button>
+      {/* Floating button. On phones the Advisor's ask box is pinned to the bottom of the screen, so the button
+          would sit on its text; there it is hidden and feedback is reached from the More menu instead. */}
+      <button onClick={() => setOpen(true)} className={`fixed bottom-20 right-4 z-30 h-9 rounded-full border border-line2 bg-white px-4 text-[13px] font-medium shadow-sm hover:border-ink md:bottom-5 ${page.startsWith('/advisor') ? 'hidden md:block' : ''}`}>Feedback</button>
       <Modal open={open} onClose={() => setOpen(false)}>
         <div className="flex flex-col gap-3.5">
           <h2 className="font-head text-[28px]">Send feedback</h2>

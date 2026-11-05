@@ -30,6 +30,7 @@ export function Shell({ children, brandName, logoUrl, initials, name, business, 
   const router = useRouter();
   const [notifOpen, setNotifOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [feedbackRequest, setFeedbackRequest] = useState(0);
   const [, run] = useAction();
   const unread = notifications.filter(n => n.unread);
   const current = NAV.find(([h]) => path.startsWith(h));
@@ -75,7 +76,7 @@ export function Shell({ children, brandName, logoUrl, initials, name, business, 
         <header className="flex h-[60px] flex-none items-center gap-2.5 border-b border-line px-4 md:px-10">
           <div className="md:hidden"><Mark size={20} /></div>
           <div className="min-w-0 flex-1 truncate font-mono text-[11px] uppercase tracking-[.08em] text-muted">{path.startsWith('/overview') ? dateLabel : current?.[1] ?? ''}</div>
-          {demo && <button onClick={switchMode} className="h-7 whitespace-nowrap rounded-full border border-dashed border-faint px-2.5 font-mono text-[10px] uppercase tracking-wider text-sub">Demo · fictional data</button>}
+          {demo && <button onClick={switchMode} className="h-7 whitespace-nowrap rounded-full border border-dashed border-faint px-2.5 font-mono text-[10px] uppercase tracking-wider text-sub" aria-label="Demo, fictional data. Switch to my workspace">Demo<span className="hidden sm:inline"> · fictional data</span></button>}
           <button onClick={() => setNotifOpen(o => !o)} aria-label={`Notifications, ${unread.length} unread`} className="flex h-9 items-center gap-1.5 rounded-[10px] border border-line bg-white px-2.5">
             <span className={cx('h-2 w-2 rounded-full', unread.length ? 'bg-danger' : 'bg-[#CDB9C9]')} /><span className="font-mono text-xs">{unread.length}</span>
           </button>
@@ -94,6 +95,7 @@ export function Shell({ children, brandName, logoUrl, initials, name, business, 
         <div className="fixed inset-0 z-30 bg-ink/20 md:hidden" onClick={() => setMoreOpen(false)} />
         <div className="animate-in fixed inset-x-0 bottom-16 z-40 flex flex-col rounded-t-2xl border-t border-line bg-white px-3 pb-3.5 pt-2.5 md:hidden">
           {[...NAV.filter(([h]) => MORE.includes(h)), ...(isAdmin ? [['/admin', 'Beta admin'] as const] : [])].map(([href, label]) => <Link key={href} href={href} onClick={() => setMoreOpen(false)} className="flex h-12 items-center border-b border-soft2 px-2.5 text-[15px]">{label}</Link>)}
+          <button onClick={() => { setMoreOpen(false); setFeedbackRequest(n => n + 1); }} className="flex h-12 items-center border-b border-soft2 px-2.5 text-left text-[15px]">Send feedback</button>
           <form action="/auth/signout" method="post"><button className="h-12 w-full px-2.5 text-left text-[15px] text-sub">Sign out</button></form>
         </div>
       </>}
@@ -113,7 +115,7 @@ export function Shell({ children, brandName, logoUrl, initials, name, business, 
           <div className="px-4 py-2.5 text-xs text-muted">{optedIn ? 'In-app plus your opted-in channels.' : 'In-app only. Email and push stay off until you opt in under Settings.'}</div>
         </div>
       </>}
-      <FeedbackButton />
+      <FeedbackButton openRequest={feedbackRequest} />
       <Toaster />
     </div>
   );

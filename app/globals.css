@@ -17,7 +17,10 @@ a { color: inherit; }
 :root { --font-head: 'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, sans-serif; }
 @keyframes nbf-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 .nbf-marquee { animation: nbf-marquee 38s linear infinite; }
-.nbf-hl { font-style: italic; background: #DFFF43; border-radius: .22em; padding: 0 .14em; white-space: nowrap; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+/* Highlight bar. Headlines use tight leading, so an inline background would ride up over the line above.
+   As an inline-block with its own line-height and a small top margin, the bar starts below the previous
+   line's descenders and leaves room for its own. */
+.nbf-hl { display: inline-block; font-style: italic; background: #DFFF43; border-radius: .22em; line-height: 1.04; margin-top: .14em; padding: 0 .14em .06em; white-space: nowrap; }
 .nbf-reveal { opacity: 0; transform: translateY(18px); transition: opacity .7s ease, transform .7s ease; }
 .nbf-reveal.nbf-in { opacity: 1; transform: none; }
 @media (prefers-reduced-motion: reduce) { .nbf-marquee { animation: none; } .nbf-reveal { opacity: 1; transform: none; transition: none; } }
