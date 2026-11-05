@@ -9,6 +9,7 @@ import { Reveal } from '@/components/marketing/Reveal';
 import { PricingCards } from '@/components/marketing/PricingCards';
 import { DELIVERABLE_LABEL } from '@/lib/brand';
 import { founderStory } from '@/lib/marketing/story';
+import { SITE } from '@/lib/site';
 
 const sec = 'py-[clamp(72px,10vw,136px)]', wrap = 'mx-auto max-w-[1240px] px-6';
 const h2 = 'text-[clamp(38px,5vw,68px)] font-extrabold leading-none tracking-[-.045em] text-balance';
@@ -37,8 +38,17 @@ export default function Home() {
     { role: 'The project manager', line: 'Deadlines live in the DMs.', chips: ['“Can we see a draft by EOD?”', 'Approval still pending'], cls: 'bg-chartreuse', chip: 'bg-[rgba(255,255,255,.65)]' }
   ];
   const words = ['NET30', 'Deposit on signing', 'NET45', '50% on delivery', 'NET60', 'Usage rights: 60 days', 'Invoice sent', 'Due on receipt', 'Following up…', 'Paid'];
+  // Tells Google the site's name and which image is the logo (shown next to the site in search results).
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      { '@type': 'Organization', '@id': `${SITE.url}/#org`, name: 'netbyfriday', url: SITE.url, logo: `${SITE.url}/logo.png`, email: SITE.contactEmail },
+      { '@type': 'WebSite', '@id': `${SITE.url}/#site`, name: 'netbyfriday', url: SITE.url, publisher: { '@id': `${SITE.url}/#org` } }
+    ]
+  };
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <section className={`${wrap} grid items-center gap-16 py-[clamp(48px,7vw,96px)] min-[1120px]:grid-cols-[minmax(0,1.02fr)_minmax(0,1fr)]`}>
         <div className="flex flex-col gap-7">
           <span className={`flex h-9 w-fit items-center gap-2.5 rounded-full border border-[#E4F28A] bg-[#F3FFC4] px-4 ${eyebrow}`}><span className="h-2 w-2 rotate-45 bg-plum" />The creator business platform</span>

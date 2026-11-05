@@ -2,7 +2,11 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { storyChapters, type StoryBlock } from '@/lib/marketing/story';
 
-export const metadata = { title: 'Our story', description: 'Why Poca built NETBYFRIDAY: the business workspace for creators.' };
+export const metadata = {
+  title: 'Our story', description: 'Why Poca built NETBYFRIDAY: the business workspace for creators.',
+  openGraph: { title: 'The story behind netbyfriday', description: 'Why Poca built the business workspace for creators.', url: '/about', type: 'article', siteName: 'netbyfriday' },
+  twitter: { card: 'summary_large_image', title: 'The story behind netbyfriday', description: 'Why Poca built the business workspace for creators.' }
+};
 
 // Editorial layout for the founder story. Every word comes from content/founder-story.ts; this file only decides
 // how it's set: a cover, four chapters, two photo spreads, pull quotes and a sign-off.

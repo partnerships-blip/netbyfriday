@@ -8,7 +8,10 @@ import { SITE } from '@/lib/site';
 export const metadata: Metadata = {
   title: { default: 'netbyfriday · The business behind being booked', template: '%s · netbyfriday' },
   description: 'The business workspace for creators: brand deals, contacts, deliverables, invoices, payment terms and an AI Advisor that answers from your own records.',
-  robots: { index: true, follow: true }, metadataBase: new URL(SITE.url)
+  robots: { index: true, follow: true }, metadataBase: new URL(SITE.url),
+  // Link previews (iMessage, WhatsApp, Slack, LinkedIn, X). The image itself comes from opengraph-image.png in this folder.
+  openGraph: { type: 'website', siteName: 'netbyfriday', url: '/', title: 'netbyfriday · The business behind being booked', description: 'The business workspace for creators.' },
+  twitter: { card: 'summary_large_image', title: 'netbyfriday · The business behind being booked', description: 'The business workspace for creators.' }
 };
 
 export default async function MarketingLayout({ children }: { children: React.ReactNode }) {
