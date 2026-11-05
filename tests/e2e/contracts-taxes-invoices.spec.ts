@@ -95,6 +95,7 @@ test.describe.serial('contracts, taxes and invoice links', () => {
     const link = (await preview.getAttribute('href'))!;
     await page.getByLabel('Payment details').fill('ACH or PayPal. Details on request.');
     await page.getByRole('button', { name: 'Save details' }).click();
+    await expect(page.getByText('Invoice details saved').first()).toBeVisible();   // saved before the brand opens the link
     await expect(page.locator('dialog textarea').first()).toHaveValue(/Marigold|Here’s invoice/);
 
     const anon = await (await browser.newContext()).newPage();               // the brand: no session
