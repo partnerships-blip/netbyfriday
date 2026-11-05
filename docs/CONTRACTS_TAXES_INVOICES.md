@@ -1,6 +1,6 @@
-# Contracts, Taxes and sendable invoices (built, not live)
+# Contracts, Taxes and sendable invoices
 
-Three features built on the branch `feature/contracts-taxes-invoices`. Each is behind a flag and invisible until a deployment turns it on.
+**Live since 2026-11-05.** All three are on by default (`DEFAULT_ON` in `lib/flags.ts`). To switch one off for a deployment, add it with a leading minus to `NEXT_PUBLIC_NBF_FLAGS`, e.g. `-taxes`, and redeploy.
 
 | Feature | Flag | Where |
 |---|---|---|
@@ -25,12 +25,11 @@ Migration `20261107000001_contracts_taxes_invoice_links.sql`:
 
 `rls_isolation.test.sql` covers contract isolation and token-only invoice reads (plan 29).
 
-## Going live (when the founder says so)
+## How it went live
 
-1. Merge the branch to `main`. The `staging-db` workflow applies the migration. It is additive, and the flags are still off.
-2. In Vercel → Settings → Environment Variables, set `NEXT_PUBLIC_NBF_FLAGS` to include `contracts,taxes,invoiceLinks` (comma separated; keep any existing flags). Redeploy.
-3. PDF reading needs `AI_PROVIDER=anthropic` with a model that reads PDFs (current Claude models do). With an OpenAI-compatible provider, creators can still paste contract text.
-4. Run the Live tests workflow. The new e2e spec skips itself on deployments where a flag is off.
+1. Merged to `main` with the flags off; the `staging-db` workflow applied migration `20261107000001` to the Supabase project.
+2. A second commit turned the three flags on by default, so the new code never ran before its tables existed.
+3. PDF reading uses the production `AI_PROVIDER`/`AI_MODEL`; with an OpenAI-compatible provider creators can still paste contract text.
 
 ## Not included (ask first)
 
