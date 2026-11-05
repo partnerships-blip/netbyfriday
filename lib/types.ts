@@ -19,7 +19,7 @@ export interface Deal {
 
 export interface Invoice {
   id: string; number: string; dealId: string | null; clientName: string; description: string; stream: Stream;
-  amountCents: number; issuedOn: string; dueOn: string; terms: string; voidedAt: string | null;
+  amountCents: number; issuedOn: string; dueOn: string; terms: string; voidedAt: string | null; shareToken?: string | null; sentAt?: string | null; billToEmail?: string;
 }
 export interface Payment { id: string; invoiceId: string; amountCents: number; receivedOn: string; note: string }
 export interface IncomeEntry { id: string; stream: Stream; amountCents: number; receivedOn: string; counterparty: string; description: string }
@@ -70,3 +70,21 @@ export interface Insight {
 }
 
 export type ActionResult = { ok: true; id?: string; message?: string } | { ok: false; error: string };
+
+export interface Contract {
+  id: string; dealId: string | null; status: 'review' | 'confirmed'; title: string; fileName: string; hasFile: boolean;
+  brandName: string; feeCents: number | null; paymentTerms: string; signedOn: string | null;
+  usageRights: string; usageStartsOn: string | null; usageEndsOn: string | null;
+  exclusivity: string; exclusivityStartsOn: string | null; exclusivityEndsOn: string | null;
+  whitelisting: string; revisions: string; killFee: string; otherTerms: string;
+  extracted: ContractExtraction | null; confirmedAt: string | null; createdAt: string;
+}
+/** One proposed value from the contract, with the wording it came from. `found` = the quote was located in the text. */
+export interface ExtractedField { value: string; quote: string; found?: boolean }
+export interface ContractExtraction {
+  source: 'pdf' | 'text';
+  fields: Partial<Record<'title' | 'brandName' | 'fee' | 'paymentTerms' | 'signedOn' | 'usageRights' | 'usageDays' | 'usageStartsOn' | 'usageEndsOn'
+    | 'exclusivity' | 'exclusivityDays' | 'exclusivityStartsOn' | 'exclusivityEndsOn' | 'whitelisting' | 'revisions' | 'killFee' | 'otherTerms', ExtractedField>>;
+  deliverables: { name: string; dueOn: string | null; quote: string; found?: boolean }[];
+  warnings: string[];
+}

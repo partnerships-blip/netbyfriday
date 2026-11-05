@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { Btn, Card, Eyebrow, Pill, Bar, EVIDENCE, cx } from '@/components/ui';
 import { FormModal } from '@/components/FormModal';
 import { DraftModal, type DraftTarget } from '@/components/DraftModal';
+import { SendInvoiceModal, type SendTarget } from '@/components/SendInvoiceModal';
+import { flag } from '@/lib/flags';
 import { invoiceFields, paymentFields, incomeFields, expenseFields, goalFields } from '@/components/forms';
 import { useAction, toast } from '@/components/Toaster';
 import { createInvoice, recordPayment, deletePayment, voidInvoice, addIncome, deleteIncome, addExpense, deleteExpense, saveGoals } from '@/app/(app)/actions';
@@ -14,12 +16,14 @@ import { STREAM_COLOR, STREAM_LABEL } from '@/lib/brand';
 const STATE: Record<string, { label: string; tone: any }> = { paid: { label: 'Paid', tone: 'ok' }, overdue: { label: 'Overdue', tone: 'danger' }, partial: { label: 'Partially paid', tone: 'warn' }, awaiting: { label: 'Awaiting payment', tone: 'neutral' } };
 type Modal = null | { kind: 'invoice' } | { kind: 'pay'; id: string; balance: number } | { kind: 'income' } | { kind: 'expense' } | { kind: 'goals' };
 
-export function MoneyClient({ m, deals, income, expenses, readOnly, today }: { m: any; deals: { id: string; label: string; email: string; brand: string }[]; income: any[]; expenses: any[]; readOnly: boolean; today: string; profile: any; brandName: string }) {
+export function MoneyClient({ m, deals, income, expenses, readOnly, today, invoiceSettings, fromName }: { m: any; deals: { id: string; label: string; email: string; brand: string; contactName?: string }[]; invoiceSettings?: { paymentDetails: string; email: string }; fromName?: string; income: any[]; expenses: any[]; readOnly: boolean; today: string; profile: any; brandName: string }) {
   const router = useRouter();
   const [tab, setTab] = useState<'Open' | 'Overdue' | 'Paid' | 'All' | 'Calendar'>('Open');
   const [modal, setModal] = useState<Modal>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [draft, setDraft] = useState<DraftTarget | null>(null);
+  const [send, setSend] = useState<SendTarget | null>(null);
+  const links = flag('invoiceLinks');
   const [pending, run] = useAction();
   const refresh = () => router.refresh();
   const guard = (fn: () => void) => () => (readOnly ? toast('Demo mode is read-only.') : fn());
@@ -75,9 +79,10 @@ export function MoneyClient({ m, deals, income, expenses, readOnly, today }: { m
               <span className="min-w-0"><span className="font-medium">{v.clientName}</span><br /><span className="text-xs text-muted">Due {shortDate(v.dueOn)} · {v.terms}</span></span>
               <span className="tnum">{formatCentsExact(v.amountCents)}</span>
               <span className="tnum font-medium">{formatCentsExact(v.balanceCents)}</span>
-              <span><Pill tone={STATE[v.state].tone}>{v.daysLate ? `Overdue ${v.daysLate}d` : v.daysUntil !== null ? `${STATE[v.state].label} · ${v.daysUntil}d` : STATE[v.state].label}</Pill></span>
+              <span className="flex flex-wrap items-center gap-1"><Pill tone={STATE[v.state].tone}>{v.daysLate ? `Overdue ${v.daysLate}d` : v.daysUntil !== null ? `${STATE[v.state].label} · ${v.daysUntil}d` : STATE[v.state].label}</Pill>{links && v.sentAt && <span className="font-mono text-[10px] text-muted">Sent {shortDate(v.sentAt.slice(0, 10))}</span>}</span>
               <span className="col-span-2 flex flex-wrap gap-1.5 md:col-span-1 md:justify-end">
                 {v.balanceCents > 0 && !readOnly && <Btn size="sm" onClick={() => setModal({ kind: 'pay', id: v.id, balance: v.balanceCents })}>Record payment</Btn>}
+                {links && v.balanceCents > 0 && <Btn size="sm" variant="primary" onClick={() => { const d = deals.find(x => x.id === v.dealId); setSend({ id: v.id, number: v.number, clientName: v.clientName, description: v.description, balanceCents: v.balanceCents, dueOn: v.dueOn, terms: v.terms, to: v.billToEmail || d?.email || '', contactName: d?.contactName || '', sentAt: v.sentAt ?? null, hasLink: !!v.shareToken, overdue: v.daysLate > 0 }); }}>{v.sentAt ? 'Resend' : 'Send'}</Btn>}
                 {v.balanceCents > 0 && <Btn size="sm" onClick={() => { const d = deals.find(x => x.id === v.dealId); setDraft({ kind: 'Following up on payment', invoiceId: v.id, label: v.clientName, to: d?.email }); }}>Reminder</Btn>}
                 <a href={`/api/invoices/${v.id}/print`} target="_blank" rel="noopener" className="inline-flex h-[30px] items-center rounded-[10px] border border-line2 bg-white px-2.5 text-xs font-medium">PDF</a>
               </span>
@@ -156,6 +161,7 @@ export function MoneyClient({ m, deals, income, expenses, readOnly, today }: { m
       <FormModal open={modal?.kind === 'expense'} onClose={() => setModal(null)} title="Add expense" fields={expenseFields} initial={{ spentOn: today }} submitLabel="Add expense" action={wrap(addExpense)} />
       {modal?.kind === 'goals' && <FormModal open onClose={() => setModal(null)} title="Revenue goals" note="Progress is measured against money received." fields={goalFields} initial={{ monthly: m.goals.monthlyCents ? String(m.goals.monthlyCents / 100) : '', annual: m.goals.annualCents ? String(m.goals.annualCents / 100) : '' }} submitLabel="Save goals" action={wrap(saveGoals)} />}
       <DraftModal target={draft} onClose={() => setDraft(null)} />
+      {links && <SendInvoiceModal target={send} onClose={() => setSend(null)} fromName={fromName || 'me'} settings={invoiceSettings ?? { paymentDetails: '', email: '' }} readOnly={readOnly} />}
     </>
   );
 }

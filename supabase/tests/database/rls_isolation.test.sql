@@ -2,7 +2,7 @@
 -- Verifies invite gating, workspace isolation, cross-tenant FK protection, and payment guards.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(23);
+select plan(29);
 
 insert into public.invite_codes(code, max_uses) values ('PGTAP-TEST', 5);
 
@@ -44,6 +44,12 @@ select lives_ok(
      values ((select id from t_ws where owner_id = '11111111-1111-1111-1111-111111111111'), 'Send invoice reminder',
              'aaaaaaaa-0000-0000-0000-000000000002', 'aaaaaaaa-0000-0000-0000-000000000004', 'aaaaaaaa-0000-0000-0000-000000000003') $$,
   'A links a task to their own partnership, contact and invoice');
+select lives_ok(
+  $$ insert into public.contracts (id, workspace_id, deal_id, title, usage_rights, usage_starts_on, usage_ends_on)
+     values ('aaaaaaaa-0000-0000-0000-000000000005', (select id from t_ws where owner_id = '11111111-1111-1111-1111-111111111111'),
+             'aaaaaaaa-0000-0000-0000-000000000002', 'Launch agreement', 'Paid social, 60 days', '2026-10-01', '2026-11-30') $$,
+  'A adds a contract to their own partnership');
+update public.invoices set share_token = 'cccccccc-0000-0000-0000-000000000001' where id = 'aaaaaaaa-0000-0000-0000-000000000003';
 select throws_ok(
   $$ insert into public.payments (workspace_id, invoice_id, amount_cents, received_on)
      values ((select id from t_ws where owner_id = '11111111-1111-1111-1111-111111111111'), 'aaaaaaaa-0000-0000-0000-000000000003', 300001, '2026-10-11') $$,
@@ -95,6 +101,17 @@ select throws_ok(
   '23503', null, 'B cannot link a task in their workspace to A partnership');
 
 select throws_ok($$ select public.admin_overview() $$, '42501', 'NOT_ADMIN', 'non-admin cannot read admin overview');
+
+select is((select count(*)::int from public.contracts), 0, 'B cannot see A contracts');
+select throws_ok(
+  $$ insert into public.contracts (workspace_id, title) values ((select id from t_ws where owner_id = '11111111-1111-1111-1111-111111111111'), 'Hijack') $$,
+  '42501', null, 'B cannot add a contract to A workspace');
+select is(public.shared_invoice(null), null, 'no token, no invoice');
+
+-- ---------- anonymous (a brand opening a shared invoice link) ----------
+set local role anon;
+select is(public.shared_invoice('cccccccc-0000-0000-0000-000000000001')->>'number', 'INV-1', 'anyone with the link sees that one invoice');
+select is(public.shared_invoice('cccccccc-0000-0000-0000-000000000002'), null, 'a wrong token reveals nothing');
 
 select * from finish();
 rollback;

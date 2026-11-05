@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 
-const PUBLIC = ['/login', '/signup', '/auth', '/reset', '/pricing', '/waitlist', '/privacy', '/terms', '/about'];
+const PUBLIC = ['/login', '/signup', '/auth', '/reset', '/pricing', '/waitlist', '/privacy', '/terms', '/about', '/i/'];
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });

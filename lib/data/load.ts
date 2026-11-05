@@ -3,7 +3,8 @@ import { cache } from 'react';
 import { requireWorkspace, isDemo, todayIn } from '../auth';
 import { compute } from '../finance/core.js';
 import { demoData } from '../demo/fixture';
-import type { CoreInput, Profile, Brand, Deal, Contact, Task } from '../types';
+import type { CoreInput, Profile, Brand, Deal, Contact, Task, Contract } from '../types';
+import { flag } from '../flags';
 
 function must<T>(r: { data: T | null; error: unknown }): T {
   if (r.error) throw r.error;
@@ -27,11 +28,11 @@ export const loadApp = cache(async () => {
   if (isDemo()) {
     const d = demoData();
     const demoBrands = Array.from(new Map(d.input.deals.map(x => [x.brandId, { id: x.brandId, name: x.brandName }])).values());
-    return { brandList: demoBrands, user, ws, brand, prefs, isAdmin: !!admin, demo: true, readOnly: true, profile: d.profile, realProfile, input: d.input, metrics: compute(d.input), readKeys: [] as string[], checklistDone: [] as string[], advisorHistory: [] as any[] };
+    return { brandList: demoBrands, user, ws, brand, prefs, isAdmin: !!admin, demo: true, contracts: d.contracts, invoiceSettings: { taxSetAsidePct: 25, paymentDetails: d.paymentDetails, email: '' }, readOnly: true, profile: d.profile, realProfile, input: d.input, metrics: compute(d.input), readKeys: [] as string[], checklistDone: [] as string[], advisorHistory: [] as any[] };
   }
 
   const w = ws.id;
-  const [brands, deals, dels, invoices, payments, income, expenses, opps, aud, cats, atts, reads, checks, history, contacts, tasks] = await Promise.all([
+  const [brands, deals, dels, invoices, payments, income, expenses, opps, aud, cats, atts, reads, checks, history, contacts, tasks, contracts] = await Promise.all([
     sb.from('brands').select('id,name').eq('workspace_id', w),
     sb.from('deals').select('*').eq('workspace_id', w).order('started_on', { ascending: false }),
     sb.from('deliverables').select('*').eq('workspace_id', w).order('due_on'),
@@ -47,7 +48,8 @@ export const loadApp = cache(async () => {
     sb.from('checklist_state').select('key,done_on').eq('workspace_id', w),
     sb.from('advisor_messages').select('id,role,content,payload,created_at').eq('workspace_id', w).eq('user_id', user.id).order('created_at').limit(60),
     sb.from('contacts').select('*').eq('workspace_id', w).order('name'),
-    sb.from('tasks').select('*').eq('workspace_id', w).order('created_at', { ascending: false })
+    sb.from('tasks').select('*').eq('workspace_id', w).order('created_at', { ascending: false }),
+    flag('contracts') ? sb.from('contracts').select('*').eq('workspace_id', w).order('created_at', { ascending: false }) : Promise.resolve({ data: [], error: null })
   ]);
   const brandName = new Map(must<any[]>(brands).map(b => [b.id, b.name]));
   const delRows = must<any[]>(dels), attRows = must<any[]>(atts);
@@ -62,7 +64,7 @@ export const loadApp = cache(async () => {
       deliverables: delRows.filter(x => x.deal_id === d.id).map(x => ({ id: x.id, dealId: x.deal_id, name: x.name, dueOn: x.due_on, status: x.status, notes: x.notes })),
       attachments: attRows.filter(a => a.deal_id === d.id).map(a => ({ id: a.id, fileName: a.file_name }))
     })),
-    invoices: must<any[]>(invoices).map(v => ({ id: v.id, number: v.number, dealId: v.deal_id, clientName: v.client_name, description: v.description, stream: v.stream, amountCents: Number(v.amount_cents), issuedOn: v.issued_on, dueOn: v.due_on, terms: v.terms, voidedAt: v.voided_at })),
+    invoices: must<any[]>(invoices).map(v => ({ id: v.id, number: v.number, dealId: v.deal_id, clientName: v.client_name, description: v.description, stream: v.stream, amountCents: Number(v.amount_cents), issuedOn: v.issued_on, dueOn: v.due_on, terms: v.terms, voidedAt: v.voided_at, shareToken: v.share_token ?? null, sentAt: v.sent_at ?? null, billToEmail: v.bill_to_email ?? '' })),
     payments: must<any[]>(payments).map(p => ({ id: p.id, invoiceId: p.invoice_id, amountCents: Number(p.amount_cents), receivedOn: p.received_on, note: p.note })),
     income: must<any[]>(income).map(e => ({ id: e.id, stream: e.stream, amountCents: Number(e.amount_cents), receivedOn: e.received_on, counterparty: e.counterparty, description: e.description })),
     expenses: must<any[]>(expenses).map(x => ({ id: x.id, category: x.category, amountCents: Number(x.amount_cents), spentOn: x.spent_on, note: x.note })),
@@ -76,10 +78,21 @@ export const loadApp = cache(async () => {
   return {
     brandList: must<any[]>(brands).map(b => ({ id: b.id as string, name: b.name as string })),
     user, ws, brand, prefs, isAdmin: !!admin, demo: false, readOnly: false, profile: realProfile, realProfile, input, metrics: compute(input),
+    contracts: must<any[]>(contracts).map(mapContract),
+    invoiceSettings: { taxSetAsidePct: Number(ws.tax_set_aside_pct ?? 25), paymentDetails: ws.invoice_payment_details ?? '', email: ws.invoice_email ?? '' },
     readKeys: must<any[]>(reads).map(r => r.key), checklistDone: must<any[]>(checks).filter(c => c.done_on === today).map(c => c.key),
     advisorHistory: must<any[]>(history)
   };
 });
+
+export function mapContract(c: any): Contract {
+  return { id: c.id, dealId: c.deal_id, status: c.status, title: c.title, fileName: c.file_name, hasFile: !!c.storage_path, brandName: c.brand_name,
+    feeCents: c.fee_cents === null ? null : Number(c.fee_cents), paymentTerms: c.payment_terms, signedOn: c.signed_on,
+    usageRights: c.usage_rights, usageStartsOn: c.usage_starts_on, usageEndsOn: c.usage_ends_on,
+    exclusivity: c.exclusivity, exclusivityStartsOn: c.exclusivity_starts_on, exclusivityEndsOn: c.exclusivity_ends_on,
+    whitelisting: c.whitelisting, revisions: c.revisions, killFee: c.kill_fee, otherTerms: c.other_terms,
+    extracted: c.extracted && Object.keys(c.extracted).length ? c.extracted : null, confirmedAt: c.confirmed_at, createdAt: c.created_at };
+}
 
 export function mapProfile(p: any): Profile {
   return { displayName: p.display_name, businessName: p.business_name, niche: p.niche, location: p.location, platforms: p.platforms, followerRange: p.follower_range,

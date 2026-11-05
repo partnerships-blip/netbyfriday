@@ -15,7 +15,8 @@ export default async function MoneyPage() {
           goals: m.goals, months: m.months, byStream: m.byStream, byCounterparty: m.byCounterparty, invoices: m.invoices, overdueCount: m.overdueInvoices.length, openCount: m.openInvoices.length,
           expectedWeeks: m.expectedWeeks, expected8wCents: m.expected8wCents, expectedLaterCents: m.expectedLaterCents, termsStats: m.termsStats,
           insights: m.insights.filter((i: any) => ['Revenue', 'Payment', 'Risk'].includes(i.category)).slice(0, 3) }}
-        deals={app.input.deals.map(d => ({ id: d.id, label: `${d.brandName}${d.campaign ? ' – ' + d.campaign : ''}`, email: d.contactEmail, brand: d.brandName }))}
+        deals={app.input.deals.map(d => ({ id: d.id, label: `${d.brandName}${d.campaign ? ' – ' + d.campaign : ''}`, email: d.contactEmail, brand: d.brandName, contactName: d.contactName }))}
+        invoiceSettings={{ paymentDetails: app.invoiceSettings.paymentDetails, email: app.invoiceSettings.email }} fromName={app.profile.businessName || app.profile.displayName || app.brand.name}
         income={[...app.input.income].sort((a, b) => (a.receivedOn < b.receivedOn ? 1 : -1))}
         expenses={[...app.input.expenses].sort((a, b) => (a.spentOn < b.spentOn ? 1 : -1))}
         profile={app.profile} brandName={app.brand.name} />
