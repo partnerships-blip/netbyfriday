@@ -92,3 +92,18 @@ test('highlight bars never cover the headline line above them', async ({ page })
     expect(gap!, `${path} @${width}px`).toBeGreaterThanOrEqual(-0.5);
   }
 });
+
+test('home page shows the contract upload demo and the taxes & invoices section', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('link', { name: 'Contracts' }).first()).toBeVisible();
+  const contracts = page.locator('#contracts');
+  await contracts.scrollIntoViewIfNeeded();
+  await expect(contracts.getByRole('heading', { name: /Upload the contract/ })).toBeVisible();
+  await expect(contracts.getByRole('list', { name: 'Terms found in the contract' })).toBeVisible({ timeout: 10_000 });   // the demo plays when seen
+  await expect(contracts.getByText('Confirm contract')).toBeVisible({ timeout: 10_000 });
+  const taxes = page.locator('#taxes');
+  await taxes.scrollIntoViewIfNeeded();
+  await expect(taxes.getByText(/Set aside so far, at \d+% of profit/)).toBeVisible();
+  await expect(taxes.getByText('What the brand sees')).toBeVisible();
+  await expect(page.getByText('Sample data').first()).toBeVisible();
+});

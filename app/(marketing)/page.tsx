@@ -5,6 +5,7 @@ import { HeroPreview } from '@/components/marketing/HeroPreview';
 import { Net45 } from '@/components/marketing/Net45';
 import { RevenueBars } from '@/components/marketing/RevenueBars';
 import { AdvisorDemo } from '@/components/marketing/AdvisorDemo';
+import { ContractDemo } from '@/components/marketing/ContractDemo';
 import { Reveal } from '@/components/marketing/Reveal';
 import { PricingCards } from '@/components/marketing/PricingCards';
 import { DELIVERABLE_LABEL } from '@/lib/brand';
@@ -22,6 +23,9 @@ const FAQ: [string, string][] = [
   ['Can the AI send emails or change my invoices?', 'No. It writes drafts you edit and send yourself, and it can suggest small changes such as adding a task, which happen only when you click Confirm. It never changes invoices, payments or other money records.'],
   ['Will netbyfriday get me paid faster?', 'netbyfriday doesn’t control when brands pay. It shows what is owed, when it is due under each payment term, and who to follow up with, so nothing slips.'],
   ['What counts as revenue?', 'Money you have actually received: payments recorded against invoices, and income you record directly. Deal fees, unpaid invoices and pipeline are shown separately and never added to revenue.'],
+  ['What happens when I upload a contract?', 'netbyfriday reads it and suggests the terms: fee, payment terms, usage rights, exclusivity and deliverables, each shown with the contract wording it came from. You check and edit them before anything is saved. The file is stored privately in your workspace. It isn’t legal advice.'],
+  ['Does netbyfriday do my taxes?', 'No. The Taxes page shows what you’ve received, your expenses and how much to keep aside at a rate you choose, plus the quarterly estimated-tax dates and which payers are likely to send a 1099. It’s for planning and for your accountant, not tax advice, and nothing is filed or paid for you.'],
+  ['Can I send invoices from netbyfriday?', 'Yes. Each invoice gets a private link the brand can view and download, and the message opens in your own email app, ready to send. netbyfriday doesn’t email brands on your behalf.'],
   ['How do I get access?', 'netbyfriday is in a private beta. Join the waitlist and we’ll send you an invite code when a spot opens.']
 ];
 
@@ -83,7 +87,7 @@ export default function Home() {
         <div className="mt-10 grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4">
           {[
             ['Brand deal management', 'Every partnership from first pitch to final payment, on a board or in a table.', <div key="a" className="flex flex-col gap-1.5">{s.pipeline.slice(1, 6).map(p => <div key={p.label} className="flex items-center gap-2 text-xs"><span className="w-24 font-semibold">{p.label}</span><div className="h-2 flex-1 rounded bg-[#F0EBF2]"><div className="h-full rounded bg-plum" style={{ width: Math.max(8, p.n * 25) + '%' }} /></div><span className="w-4 text-right">{p.n}</span></div>)}</div>],
-            ['Invoice & payment tracking', 'Partial payments, NET terms, due dates and what is overdue, calculated for you.', <div key="b"><div className="text-3xl font-extrabold tracking-tight">{s.outstanding}</div><div className="text-xs text-muted">outstanding</div>{s.terms.map(t => <div key={t.terms} className="mt-1.5 flex justify-between text-xs"><span className="rounded-full bg-[#F3FFC4] px-2 font-bold">{t.terms}</span><span>{t.open}</span></div>)}</div>],
+            ['Invoice & payment tracking', 'Send each invoice as a private link. Partial payments, NET terms and what is overdue, calculated for you.', <div key="b"><div className="text-3xl font-extrabold tracking-tight">{s.outstanding}</div><div className="text-xs text-muted">outstanding</div>{s.terms.map(t => <div key={t.terms} className="mt-1.5 flex justify-between text-xs"><span className="rounded-full bg-[#F3FFC4] px-2 font-bold">{t.terms}</span><span>{t.open}</span></div>)}</div>],
             ['Content & deliverables', 'Deadlines, drafts in review and approvals for every campaign, with a calendar.', <div key="c"><div className="text-sm font-extrabold">{s.campaign}</div>{s.deliverables.map(x => <div key={x.name} className="mt-1.5 flex items-center justify-between rounded-lg border border-line px-2 py-1.5 text-xs"><span>{x.name}</span><span className="rounded-full bg-[#F3EEF4] px-1.5 font-semibold">{DELIVERABLE_LABEL[x.status]}</span></div>)}</div>],
             ['Contacts & relationships', 'The people at each brand, linked to their partnerships, invoices and tasks.', <div key="d"><div className="text-4xl font-extrabold tracking-tight">{s.repeatPct}</div><div className="text-xs text-muted">of brands booked again</div><div className="mt-3 flex h-3 overflow-hidden rounded-full">{['#32152F', '#6C4B67', '#9A8396', '#C4B0C0', '#DFFF43'].map(c => <div key={c} className="flex-1" style={{ background: c }} />)}</div></div>],
             ['Revenue intelligence', 'Revenue received, expected cash, payment-term patterns and client concentration.', <div key="e" className="flex h-full items-end gap-1">{s.months.map(m => <div key={m.label} className="flex-1 rounded-t bg-plum" style={{ height: Math.max(6, m.cents / Math.max(...s.months.map(x => x.cents)) * 120) }} />)}</div>],
@@ -96,11 +100,51 @@ export default function Home() {
         </div>
       </Reveal></div></section>
 
+      <section id="contracts" className={`${wrap} ${sec}`}><Reveal>
+        <div className={eyebrow}>Contracts</div>
+        <h2 className={`${h2} mt-3 max-w-[900px]`}>Upload the contract. <em className="text-[#6C4B67]">Know what you signed.</em></h2>
+        <p className="mt-5 max-w-[720px] text-[18px] leading-relaxed text-[#4A2A45]">Drop in a brand agreement and netbyfriday pulls out the fee, payment terms, usage rights, exclusivity and deliverables, each shown next to the sentence it came from. Confirm, and it becomes a partnership with deadlines and reminders before your rights or exclusivity run out.</p>
+        <div className="mt-10"><ContractDemo {...s.contract} /></div>
+        <p className="mt-4 text-[13px] text-muted">Demo with a fictional sample contract. AI-read terms can be wrong, so you review every one; netbyfriday isn’t legal advice.</p>
+      </Reveal></section>
+
+      <section id="taxes" className={`bg-lavender ${sec}`}><div className={wrap}><Reveal>
+        <div className={eyebrow}>Taxes & invoices</div>
+        <h2 className={`${h2} mt-3 max-w-[900px]`}>Know what to keep for taxes. Send invoices that look the part.</h2>
+        <div className="mt-10 grid gap-4 min-[900px]:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+          <div className="flex flex-col gap-5 rounded-[24px] bg-plum p-[clamp(22px,3vw,32px)] text-bg">
+            <div className="flex items-center justify-between gap-3"><span className="font-mono text-[11px] uppercase tracking-[.14em] text-[#CDB9C9]">Taxes · {s.taxes.year}</span><span className="rounded-full bg-chartreuse px-2.5 py-0.5 text-[11px] font-bold text-plum">Sample data</span></div>
+            <div><div className="text-[13px] text-[#CDB9C9]">Set aside so far, at {s.taxes.pct}% of profit</div><div className="text-[clamp(44px,6vw,64px)] font-extrabold leading-none tracking-[-.04em] text-chartreuse">{s.taxes.setAside}</div></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-[16px] bg-white/[.07] p-4"><div className="text-[12px] text-[#CDB9C9]">Money received</div><div className="text-[24px] font-extrabold tracking-[-.03em]">{s.taxes.received}</div></div>
+              <div className="rounded-[16px] bg-white/[.07] p-4"><div className="text-[12px] text-[#CDB9C9]">Estimated profit</div><div className="text-[24px] font-extrabold tracking-[-.03em]">{s.taxes.profit}</div></div>
+            </div>
+            {s.taxes.nextDue && <div className="rounded-[16px] border border-chartreuse/50 p-4"><div className="font-mono text-[11px] uppercase tracking-[.12em] text-[#CDB9C9]">Next estimated payment · Q{s.taxes.nextQ}</div><div className="mt-1 text-[20px] font-extrabold">Due {s.taxes.nextDue}</div></div>}
+            <ul className="flex flex-col gap-1.5 text-[15px] text-[#E9DEE7]">
+              <li>• Your set-aside, by IRS estimated-tax period</li>
+              <li>• {s.taxes.payers1099} of {s.taxes.payers} payers likely to send a 1099 ({s.taxes.threshold}+ in a year)</li>
+              <li>• One-click export for your accountant</li>
+            </ul>
+            <p className="text-[12px] leading-relaxed text-[#CDB9C9]">Planning numbers from money you’ve actually received, not tax advice. netbyfriday doesn’t file or pay taxes for you.</p>
+          </div>
+          {s.invoiceLink && <div className="flex flex-col gap-4 rounded-[24px] border border-line bg-white p-[clamp(22px,3vw,32px)]">
+            <div className="flex items-center justify-between gap-3"><span className="font-mono text-[11px] uppercase tracking-[.14em] text-muted">What the brand sees</span><span className="rounded-full bg-[#F0EBF2] px-2.5 py-0.5 text-[11px] font-bold">Sample data</span></div>
+            <div className="rounded-[18px] border border-line p-5">
+              <div className="flex items-start justify-between gap-3"><span className="text-[16px] font-extrabold tracking-[-.02em]">{s.invoiceLink.from}</span><span className="text-right"><span className="block text-[26px] font-extrabold leading-none tracking-[-.03em]">Invoice</span><span className="font-mono text-[12px]">{s.invoiceLink.number}</span></span></div>
+              <div className="mt-4 grid grid-cols-2 gap-3 border-t border-line pt-4 text-[13px]"><span><span className="block font-mono text-[10px] uppercase tracking-[.1em] text-muted">Bill to</span><b>{s.invoiceLink.client}</b></span><span><span className="block font-mono text-[10px] uppercase tracking-[.1em] text-muted">Due</span><b>{s.invoiceLink.due}</b> · {s.invoiceLink.terms}</span></div>
+              <div className="mt-4 flex items-baseline justify-between rounded-[12px] bg-plum px-4 py-3 text-bg"><span className="text-[13px] font-semibold">Balance due</span><span className="text-[22px] font-extrabold">{s.invoiceLink.amount}</span></div>
+              <div className="mt-3 rounded-[10px] bg-[#F3FFC4] px-3 py-2 text-[12px]">How to pay: your instructions, on every invoice</div>
+            </div>
+            <p className="text-[15px] leading-relaxed text-[#4A2A45]">Send any invoice as a private link the brand can view and download as a PDF, no account needed. The message opens in your own email, ready to send, and the invoice is marked as sent. Turn the link off any time.</p>
+          </div>}
+        </div>
+      </Reveal></div></section>
+
       <section id="how" className={`${wrap} ${sec}`}><Reveal>
         <div className={eyebrow}>How it works</div>
         <h2 className={`${h2} mt-3 max-w-[900px]`}>Your records in. Clarity out.</h2>
         <div className="mt-10 grid grid-cols-[repeat(auto-fit,minmax(250px,1fr))] gap-4">{[
-          ['1', 'Add your business', 'Enter your partnerships, the people you work with, your invoices and your tasks. Import past deals from a spreadsheet.', 'bg-white border border-line'],
+          ['1', 'Add your business', 'Upload your contracts and the terms are read for you. Add partnerships, contacts, invoices and tasks, or import past deals from a spreadsheet.', 'bg-white border border-line'],
           ['2', 'See it connected', 'Every deal links to its contact, deliverables, invoices and payments. Dashboards calculate revenue, what is owed and what is due.', 'bg-lavender'],
           ['3', 'Ask and act', 'Ask the AI Advisor what needs attention. It answers from your records, drafts the follow-up, and waits for you to confirm anything.', 'bg-chartreuse']
         ].map(([n, t, d, cls]) => <div key={n} className={`flex min-h-[260px] flex-col gap-4 rounded-[24px] p-[26px] ${cls}`}><span className="grid h-11 w-11 place-items-center rounded-full bg-plum text-lg font-extrabold text-bg">{n}</span><div className="text-2xl font-extrabold tracking-tight">{t}</div><p className="text-[15px] leading-relaxed opacity-80">{d}</p></div>)}</div>

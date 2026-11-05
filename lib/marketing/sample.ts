@@ -2,7 +2,7 @@ import 'server-only';
 // Everything the public site shows about "a creator's business" is calculated here, by the real engine, from the fictional
 // Demo workspace (fictional creator "Jordan Lee"). Nothing on the site is a hand-typed figure.
 import { demoData } from '../demo/fixture';
-import { compute, formatCents, monthLabel, shortDate, STAGES } from '../finance/core.js';
+import { compute, formatCents, formatCentsExact, monthLabel, shortDate, addDays, taxYear, STAGES } from '../finance/core.js';
 import { STAGE_LABEL } from '../brand';
 
 export function siteSample() {
@@ -15,7 +15,44 @@ export function siteSample() {
   const first6 = m.revenueByMonth.slice(0, 6).reduce((a: number, x: any) => a + x.totalCents, 0), last6 = m.revenueByMonth.slice(5, 11).reduce((a: number, x: any) => a + x.totalCents, 0);
   const evidence = (e: string) => (e === 'verified' ? 'Verified' : e === 'estimate' ? 'Estimate' : e === 'suggested' ? 'Suggestion' : 'Insufficient data');
   const brightline = m.overdueInvoices[0];
+  // Contract demo: the sample creator's Glow Season agreement. The "contract" text is written from the same record the
+  // extracted terms come from, so the demo can't show a term the contract doesn't contain.
+  const k = d.contracts.find(x => x.id === 'demo-k1')!;
+  const long = (iso: string | null) => (iso ? new Date(iso + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : '');
+  const kDeal = i.deals.find(x => x.id === k.dealId)!;
+  const dels = kDeal.deliverables.map(x => x.name);
+  const contract = {
+    file: k.fileName, title: k.title,
+    clauses: [
+      { key: 'brand', text: `This agreement is made between ${k.brandName} (“Brand”) and the Creator, signed ${long(k.signedOn)}.` },
+      { key: 'fee', text: `1. Fee. Brand will pay Creator a total fee of ${formatCentsExact(k.feeCents ?? 0)} for the deliverables below.` },
+      { key: 'terms', text: `2. Payment. ${k.paymentTerms}.` },
+      { key: 'deliverables', text: `3. Deliverables. ${dels.join('; ')}.` },
+      { key: 'usage', text: `4. Usage rights. ${k.usageRights}, from ${long(k.usageStartsOn)} through ${long(k.usageEndsOn)}.` },
+      { key: 'exclusivity', text: `5. Exclusivity. ${k.exclusivity} through ${long(k.exclusivityEndsOn)}.` },
+      { key: 'whitelisting', text: `6. Whitelisting. ${k.whitelisting}.` },
+      { key: 'kill', text: `7. Cancellation. ${k.killFee}.` }
+    ],
+    terms: [
+      { key: 'brand', label: 'Brand', value: k.brandName },
+      { key: 'fee', label: 'Fee', value: formatCents(k.feeCents ?? 0) },
+      { key: 'terms', label: 'Payment terms', value: k.paymentTerms },
+      { key: 'deliverables', label: 'Deliverables', value: `${dels.length} added to your content calendar` },
+      { key: 'usage', label: 'Usage rights', value: `Ends ${shortDate(k.usageEndsOn)}` },
+      { key: 'exclusivity', label: 'Exclusivity', value: `Ends ${shortDate(k.exclusivityEndsOn)}` },
+      { key: 'kill', label: 'Kill fee', value: k.killFee }
+    ],
+    reminder: `Reminder set for ${shortDate(addDays(k.usageEndsOn!, -7))}: usage rights end a week later. Offer a renewal if they want more time.`
+  };
+  // Taxes: the same cash-basis summary the Taxes page shows, for the sample creator's current year.
+  const tx = taxYear(i, +i.today.slice(0, 4), 25);
+  const taxes = { year: tx.year, received: $(tx.incomeCents), profit: $(tx.profitCents), setAside: $(tx.setAsideCents), pct: tx.pct,
+    nextDue: tx.nextDue?.dueOn ? long(tx.nextDue.dueOn) : null, nextQ: tx.nextDue?.n ?? null, payers1099: tx.payers.filter(p => p.over1099).length, payers: tx.payers.length,
+    threshold: $(tx.threshold1099Cents) };
+  const sendInv = m.overdueInvoices[0] ?? m.openInvoices[0];
+  const invoiceLink = sendInv ? { number: sendInv.number, client: sendInv.clientName, amount: formatCentsExact(sendInv.balanceCents), due: shortDate(sendInv.dueOn), terms: sendInv.terms, from: d.profile.businessName } : null;
   return {
+    contract, taxes, invoiceLink,
     firstName: d.profile.displayName.split(' ')[0],
     stats: [
       { label: 'Received, 12 months', value: $(m.trailing12Cents), pill: 'Verified' },
