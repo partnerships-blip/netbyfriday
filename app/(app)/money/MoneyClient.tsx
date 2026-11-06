@@ -2,7 +2,7 @@
 import { RecordView } from '@/components/RecordView';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Btn, Card, Eyebrow, Pill, Bar, EVIDENCE, cx } from '@/components/ui';
+import { Btn, Card, Empty, Eyebrow, Pill, Bar, EVIDENCE, cx } from '@/components/ui';
 import { FormModal } from '@/components/FormModal';
 import { DraftModal, type DraftTarget } from '@/components/DraftModal';
 import { SendInvoiceModal, type SendTarget } from '@/components/SendInvoiceModal';
@@ -70,7 +70,7 @@ export function MoneyClient({ m, deals, income, expenses, readOnly, today, invoi
         {tab === 'Calendar' && <RecordView<any> storageKey="invoices-calendar" rows={m.invoices} getId={v => v.id} today={today} views={['calendar']} columns={[]} noun="invoice"
           onOpen={v => { setTab(v.balanceCents ? (v.daysLate ? 'Overdue' : 'Open') : 'Paid'); setExpanded(v.id); }}
           calendar={{ dateOf: v => v.dueOn, label: v => `${v.number} · ${v.clientName} · ${v.balanceCents ? formatCents(v.balanceCents) + ' due' : 'paid'}`, tone: v => v.balanceCents === 0 ? 'done' : v.daysLate ? 'late' : 'normal' }}
-          empty={<p className="py-3 text-sm text-muted">No invoices yet.</p>} />}
+          empty={<Empty>No invoices yet. Create one when you bill a brand: the payment terms (NET30, NET60) set the due date, so you can see what’s owed and what’s overdue. Mark payments as they arrive; only money received counts as revenue.{!readOnly && <div className="mt-3"><Btn variant="primary" onClick={() => setModal({ kind: 'invoice' })}>Create your first invoice</Btn></div>}</Empty>} />}
         <div className={cx('hidden grid-cols-[88px_minmax(0,1.4fr)_100px_100px_150px_minmax(0,1.6fr)] gap-3 border-b border-line py-2 font-mono text-[10px] uppercase tracking-[.08em] text-muted', tab !== 'Calendar' && 'md:grid')}><span>Invoice</span><span>Client</span><span>Amount</span><span>Balance</span><span>Status</span><span className="text-right">Actions</span></div>
         {rows.map((v: any) => (
           <div key={v.id} className="border-b border-soft2">
@@ -96,7 +96,7 @@ export function MoneyClient({ m, deals, income, expenses, readOnly, today, invoi
             </div>}
           </div>
         ))}
-        {!rows.length && tab !== 'Calendar' && <p className="py-3 text-sm text-muted">No invoices in this view.</p>}
+        {!rows.length && tab !== 'Calendar' && (m.invoices.length ? <p className="py-3 text-sm text-muted">No invoices in this view.</p> : <div className="py-3"><Empty>No invoices yet. Create one when you bill a brand: the payment terms (NET30, NET60) set the due date, so you can see what’s owed and what’s overdue. Mark payments as they arrive; only money received counts as revenue.{!readOnly && <div className="mt-3"><Btn variant="primary" onClick={() => setModal({ kind: 'invoice' })}>Create your first invoice</Btn></div>}</Empty></div>)}
       </Card>
 
       <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
@@ -142,7 +142,7 @@ export function MoneyClient({ m, deals, income, expenses, readOnly, today, invoi
           <div className="flex items-baseline justify-between"><Eyebrow>Direct income</Eyebrow>{!readOnly && <Btn variant="ghost" onClick={() => setModal({ kind: 'income' })}>Record income</Btn>}</div>
           <p className="text-xs leading-relaxed text-muted">Money received without an invoice. Invoiced work belongs on its invoice as a payment.</p>
           {income.slice(0, 8).map(e => <div key={e.id} className="flex items-center justify-between gap-2 border-b border-soft2 py-1 text-sm"><span className="min-w-0 truncate">{STREAM_LABEL[e.stream]}{e.counterparty ? ` · ${e.counterparty}` : ''} <span className="text-xs text-muted">{shortDate(e.receivedOn)}</span></span><span className="tnum flex items-center gap-2">{formatCentsExact(e.amountCents)}{!readOnly && <button aria-label="Remove" className="text-xs text-muted hover:text-danger" onClick={() => confirm('Remove this income entry?') && run(() => deleteIncome(e.id), refresh)}>×</button>}</span></div>)}
-          {!income.length && <p className="text-sm text-muted">None recorded.</p>}
+          {!income.length && <p className="text-sm text-muted">None recorded. Add affiliate payouts, product sales or other money received without an invoice.</p>}
         </Card>
         <Card className="flex flex-col gap-2.5 px-5 py-[18px]">
           <div className="flex items-baseline justify-between"><Eyebrow>Business expenses</Eyebrow>{!readOnly && <Btn variant="ghost" onClick={() => setModal({ kind: 'expense' })}>Add</Btn>}</div>

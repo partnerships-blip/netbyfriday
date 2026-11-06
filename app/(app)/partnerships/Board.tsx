@@ -73,7 +73,7 @@ export function Board({ deals: initial, invoices, received, summary, initialDeal
         filters={[{ key: 'all', label: 'All', test: d => d.stage !== 'lost' }, { key: 'pipeline', label: 'Pipeline', test: d => ['lead', 'pitching', 'negotiating'].includes(d.stage) },
           { key: 'active', label: 'Active', test: d => ['contracted', 'in_progress'].includes(d.stage) }, { key: 'done', label: 'Completed & paid', test: d => ['completed', 'paid'].includes(d.stage) }, { key: 'lost', label: 'Lost', test: d => d.stage === 'lost' }]}
         toolbar={!readOnly && <Btn variant="primary" onClick={() => setAdding(true)}>New partnership</Btn>}
-        empty={<div className="rounded-card border border-dashed border-line2 bg-white p-7 text-sm leading-relaxed text-sub">No partnerships yet. Add your first brand deal, from an inquiry you just received to one that already paid.</div>}
+        empty={<div className="rounded-card border border-dashed border-line2 bg-white p-7 text-sm leading-relaxed text-sub">No partnerships yet? Add your first brand deal and start keeping everything in one place: the fee, payment terms, deliverables and the people involved. It can be an inquiry you just received or one that already paid.{!readOnly && <div className="mt-3"><Btn variant="primary" onClick={() => setAdding(true)}>Add a partnership</Btn></div>}</div>}
         renderBoard={shown => (
       <div className="-mx-4 flex gap-2.5 overflow-x-auto px-4 pb-3 md:-mx-10 md:px-10">
         {STAGES.map(([key, label]) => {

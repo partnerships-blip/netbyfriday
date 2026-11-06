@@ -45,7 +45,7 @@ export function TasksClient({ tasks, deals, contacts, invoices, today, readOnly 
             {links(t)[0] && <span className="truncate text-xs text-muted">{links(t)[0].l}</span>}</div> }}
         calendar={{ dateOf: t => t.dueOn, label: t => t.title, tone: t => t.status === 'done' ? 'done' : late(t) ? 'late' : 'normal' }}
         toolbar={!readOnly && <Btn variant="primary" onClick={() => setEditing('new')}>New task</Btn>}
-        empty={<Empty>No tasks yet. Add your first one: a follow-up, a shoot day, or an invoice to send. You can link it to a partnership, contact or invoice so it shows up there too.</Empty>} />
+        empty={<Empty>No tasks yet. Add your first one: a follow-up, a shoot day, or an invoice to send. You can link it to a partnership, contact or invoice so it shows up there too.{!readOnly && <div className="mt-3"><Btn variant="primary" onClick={() => setEditing('new')}>Add a task</Btn></div>}</Empty>} />
       <FormModal open={editing !== null} onClose={() => setEditing(null)} title={editing === 'new' ? 'New task' : 'Edit task'} fields={taskFields(deals, contacts, invoices)}
         submitLabel={editing === 'new' ? 'Add task' : 'Save task'}
         initial={editing && editing !== 'new' ? { title: editing.title, dueOn: editing.dueOn ?? '', priority: editing.priority, dealId: editing.dealId ?? '', contactId: editing.contactId ?? '', invoiceId: editing.invoiceId ?? '', notes: editing.notes } : { priority: 'normal', dueOn: today }}

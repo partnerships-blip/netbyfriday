@@ -7,7 +7,8 @@ import { DELIVERABLE_LABEL } from '@/lib/brand';
 import { RevenueChart } from '@/components/overview/RevenueChart';
 import { Briefing } from '@/components/overview/Briefing';
 import { InsightList } from '@/components/InsightList';
-import { EmptyStart } from '@/components/overview/EmptyStart';
+import { SetupChecklist } from '@/components/overview/SetupChecklist';
+import { setupSteps } from '@/lib/setup';
 import { TaskList } from '@/components/TaskList';
 
 export default async function OverviewPage() {
@@ -22,6 +23,8 @@ export default async function OverviewPage() {
   const taskLabels = Object.fromEntries(tasks.map(t => [t.id, [t.dealId && dealLabel.get(t.dealId), t.contactId && contactLabel.get(t.contactId)].filter(Boolean).join(' · ')]));
   const maxWeek = Math.max(1, ...m.expectedWeeks.map((w: any) => w.cents));
   const empty = !app.input.deals.length && !m.ledger.length && !app.input.invoices.length;
+  const setup = app.demo || app.readOnly ? null : setupSteps({ profile: app.profile, brands: app.brandList.length, deals: app.input.deals.length, invoices: app.input.invoices.length,
+    askedAdvisor: app.advisorHistory.some((h: any) => h.role === 'user'), keys: app.readKeys });
   const cards = [
     { label: 'Revenue this month', value: formatCents(m.thisMonthCents), sub: delta === null ? 'Money received this month. Not enough history to compare.' : `${delta >= 0 ? '+' : ''}${delta}% vs ${monthLabel(m.months[10])} (${formatCents(m.prevMonthCents)}) · received to date`, href: '/money', danger: false },
     { label: 'Outstanding payments', value: formatCents(m.outstandingCents), sub: m.overdueCents ? `${formatCents(m.overdueCents)} overdue · ${formatCents(m.upcomingCents)} not yet due` : `${formatCents(m.upcomingCents)} not yet due · nothing overdue`, href: '/money', danger: m.overdueCents > 0 },
@@ -34,7 +37,7 @@ export default async function OverviewPage() {
         <h1 className="font-head text-[36px] leading-[1.02] md:text-5xl">Good {hr < 12 ? 'morning' : hr < 18 ? 'afternoon' : 'evening'}{first ? `, ${first}` : ''}.</h1>
         <p className="text-[17px] text-muted">Here's what's happening in your business.</p>
       </div>
-      {empty && !app.demo && <EmptyStart today={m.today} />}
+      {setup && <SetupChecklist steps={setup} today={m.today} brands={app.brandList.map(b => b.name)} empty={empty} />}
       <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">
         {cards.map(c => (
           <Link key={c.label} href={c.href} className="flex flex-col gap-2.5 rounded-card border border-line bg-white p-[18px] transition hover:-translate-y-px hover:border-[#9A8396]">

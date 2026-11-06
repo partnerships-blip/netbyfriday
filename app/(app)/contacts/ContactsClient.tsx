@@ -64,7 +64,7 @@ export function ContactsClient({ contacts, brands, deals, tasks, today, readOnly
           empty={<Empty>No contacts yet. Add the people you work with at each brand or agency, then link them to partnerships and tasks.{!readOnly && <> <button className="underline" onClick={() => setEditing('new')}>Add a contact</button></>}</Empty>} />
       ) : (
         <RecordView<BrandRow> storageKey="brands" rows={brands} getId={b => b.id} today={today} noun="brand" views={['table']} columns={bCols} onOpen={b => setSelB(b.id)} search={b => b.name}
-          empty={<Empty>Brands appear here when you add a partnership or a contact with a brand name.</Empty>} />
+          empty={<Empty>No brands yet. Brands collect every partnership, invoice and contact you have with them, so you can see the whole relationship. They appear when you add a partnership or a contact with a brand name.{!readOnly && <div className="mt-3"><Btn variant="primary" onClick={() => setEditing('new')}>Add a brand contact</Btn></div>}</Empty>} />
       )}
 
       {contact && (

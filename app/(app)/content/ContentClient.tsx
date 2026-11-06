@@ -31,6 +31,6 @@ export function ContentClient({ rows, today, readOnly }: { rows: Row[]; today: s
       filters={[{ key: 'open', label: 'To do', test: x => !DONE.includes(x.status) }, { key: 'week', label: 'Due this week', test: x => !DONE.includes(x.status) && x.dueOn >= today && x.dueOn <= addDays(today, 7) },
         { key: 'review', label: 'In review', test: x => x.status === 'in_review' }, { key: 'late', label: 'Late', test: late }, { key: 'done', label: 'Done', test: x => DONE.includes(x.status) }, { key: 'all', label: 'All', test: () => true }]}
       calendar={{ dateOf: x => x.dueOn, label: x => `${x.name} · ${x.brandName}`, tone: x => DONE.includes(x.status) ? 'done' : late(x) ? 'late' : 'normal' }}
-      empty={<Empty>No deliverables yet. Open a partnership and add what you owe the brand (a Reel, a TikTok, a story set) with its due date. They all collect here.</Empty>} />
+      empty={<Empty>No deliverables yet. Open a partnership and add what you owe the brand (a Reel, a TikTok, a story set) with its due date. They all collect here. <Link href="/partnerships" className="font-semibold text-ink underline underline-offset-2">Go to partnerships</Link></Empty>} />
   );
 }
