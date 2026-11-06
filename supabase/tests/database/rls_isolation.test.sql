@@ -2,7 +2,7 @@
 -- Verifies invite gating, workspace isolation, cross-tenant FK protection, and payment guards.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(29);
+select plan(31);
 
 insert into public.invite_codes(code, max_uses) values ('PGTAP-TEST', 5);
 
@@ -65,6 +65,9 @@ select throws_ok(
      values ((select id from t_ws where owner_id = '11111111-1111-1111-1111-111111111111'), 'aaaaaaaa-0000-0000-0000-000000000003', 0, '2026-10-11') $$,
   '23514', null, 'zero payment rejected');
 
+insert into public.import_runs (workspace_id, kind, file_name, total_rows, imported)
+  values ((select id from t_ws where owner_id = '11111111-1111-1111-1111-111111111111'), 'deals', 'deals.csv', 3, 3);
+
 -- ---------- as user B ----------
 select set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}', true);
 
@@ -106,6 +109,10 @@ select is((select count(*)::int from public.contracts), 0, 'B cannot see A contr
 select throws_ok(
   $$ insert into public.contracts (workspace_id, title) values ((select id from t_ws where owner_id = '11111111-1111-1111-1111-111111111111'), 'Hijack') $$,
   '42501', null, 'B cannot add a contract to A workspace');
+select is((select count(*)::int from public.import_runs), 0, 'B cannot see A import history');
+select throws_ok(
+  $$ insert into public.import_runs (workspace_id, kind) values ((select id from t_ws where owner_id = '11111111-1111-1111-1111-111111111111'), 'contacts') $$,
+  '42501', null, 'B cannot write import history into A workspace');
 select is(public.shared_invoice(null), null, 'no token, no invoice');
 
 -- ---------- anonymous (a brand opening a shared invoice link) ----------

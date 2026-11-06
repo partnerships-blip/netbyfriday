@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Btn, cx } from '@/components/ui';
@@ -72,8 +73,8 @@ export function Board({ deals: initial, invoices, received, summary, initialDeal
         onOpen={d => setSel(d.id)} search={d => `${d.brandName} ${d.campaign} ${d.agency} ${d.contactName}`}
         filters={[{ key: 'all', label: 'All', test: d => d.stage !== 'lost' }, { key: 'pipeline', label: 'Pipeline', test: d => ['lead', 'pitching', 'negotiating'].includes(d.stage) },
           { key: 'active', label: 'Active', test: d => ['contracted', 'in_progress'].includes(d.stage) }, { key: 'done', label: 'Completed & paid', test: d => ['completed', 'paid'].includes(d.stage) }, { key: 'lost', label: 'Lost', test: d => d.stage === 'lost' }]}
-        toolbar={!readOnly && <Btn variant="primary" onClick={() => setAdding(true)}>New partnership</Btn>}
-        empty={<div className="rounded-card border border-dashed border-line2 bg-white p-7 text-sm leading-relaxed text-sub">No partnerships yet? Add your first brand deal and start keeping everything in one place: the fee, payment terms, deliverables and the people involved. It can be an inquiry you just received or one that already paid.{!readOnly && <div className="mt-3"><Btn variant="primary" onClick={() => setAdding(true)}>Add a partnership</Btn></div>}</div>}
+        toolbar={!readOnly && <div className="flex items-center gap-2"><Link href="/import?kind=deals" className="inline-flex h-9 items-center rounded-[10px] border border-line2 bg-white px-3.5 text-[13px] font-medium">Import CSV</Link><Btn variant="primary" onClick={() => setAdding(true)}>New partnership</Btn></div>}
+        empty={<div className="rounded-card border border-dashed border-line2 bg-white p-7 text-sm leading-relaxed text-sub">No partnerships yet? Add your first brand deal and start keeping everything in one place: the fee, payment terms, deliverables and the people involved. It can be an inquiry you just received or one that already paid.{!readOnly && <div className="mt-3 flex flex-wrap items-center gap-3"><Btn variant="primary" onClick={() => setAdding(true)}>Add a partnership</Btn><Link href="/import?kind=deals" className="text-[13px] font-semibold text-ink underline underline-offset-2">or import them from a spreadsheet</Link></div>}</div>}
         renderBoard={shown => (
       <div className="-mx-4 flex gap-2.5 overflow-x-auto px-4 pb-3 md:-mx-10 md:px-10">
         {STAGES.map(([key, label]) => {

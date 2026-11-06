@@ -60,8 +60,8 @@ export function ContactsClient({ contacts, brands, deals, tasks, today, readOnly
         <RecordView<Contact> storageKey="contacts" rows={contacts} getId={c => c.id} today={today} noun="contact" views={['table']} columns={cCols} onOpen={c => setSelC(c.id)}
           search={c => `${c.name} ${c.brandName ?? ''} ${c.email} ${c.role}`}
           filters={[{ key: 'all', label: 'All', test: () => true }, { key: 'follow', label: 'Follow up due', test: c => !!c.followUpOn && c.followUpOn <= today }]}
-          toolbar={!readOnly && <Btn variant="primary" onClick={() => setEditing('new')}>New contact</Btn>}
-          empty={<Empty>No contacts yet. Add the people you work with at each brand or agency, then link them to partnerships and tasks.{!readOnly && <> <button className="underline" onClick={() => setEditing('new')}>Add a contact</button></>}</Empty>} />
+          toolbar={!readOnly && <div className="flex items-center gap-2"><Link href="/import?kind=contacts" className="inline-flex h-9 items-center rounded-[10px] border border-line2 bg-white px-3.5 text-[13px] font-medium">Import CSV</Link><Btn variant="primary" onClick={() => setEditing('new')}>New contact</Btn></div>}
+          empty={<Empty>No contacts yet. Add the people you work with at each brand or agency, then link them to partnerships and tasks.{!readOnly && <> <button className="underline" onClick={() => setEditing('new')}>Add a contact</button> or <Link href="/import?kind=contacts" className="underline">import them from a spreadsheet</Link>.</>}</Empty>} />
       ) : (
         <RecordView<BrandRow> storageKey="brands" rows={brands} getId={b => b.id} today={today} noun="brand" views={['table']} columns={bCols} onOpen={b => setSelB(b.id)} search={b => b.name}
           empty={<Empty>No brands yet. Brands collect every partnership, invoice and contact you have with them, so you can see the whole relationship. They appear when you add a partnership or a contact with a brand name.{!readOnly && <div className="mt-3"><Btn variant="primary" onClick={() => setEditing('new')}>Add a brand contact</Btn></div>}</Empty>} />
