@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import { siteSample } from '@/lib/marketing/sample';
-import { PLANS, ILLUSTRATIVE_LABEL } from '@/lib/billing/plans';
 import { HeroPreview } from '@/components/marketing/HeroPreview';
 import { Net45 } from '@/components/marketing/Net45';
 import { RevenueBars } from '@/components/marketing/RevenueBars';
@@ -15,7 +14,7 @@ import { SITE } from '@/lib/site';
 const sec = 'py-[clamp(72px,10vw,136px)]', wrap = 'mx-auto max-w-[1240px] px-6';
 const h2 = 'text-[clamp(38px,5vw,68px)] font-extrabold leading-none tracking-[-.045em] text-balance';
 const eyebrow = 'text-xs font-extrabold uppercase tracking-[.2em]';
-const PV: Record<string, string> = { Verified: '#E3EEE5', Projection: '#FFFFFF', Estimate: '#F5ECD8', Suggestion: '#F3FFC4' };
+const PV: Record<string, string> = { 'From your records': '#E3EEE5', Projection: '#FFFFFF', Estimate: '#F5ECD8', Suggestion: '#F3FFC4' };
 
 const FAQ: [string, string][] = [
   ['Does netbyfriday connect to my email, bank or social accounts?', 'No. In this version you enter your own records: partnerships, contacts, invoices, payments and tasks. That keeps your data in one place you control, and nothing is read from your inbox or accounts.'],
@@ -26,7 +25,7 @@ const FAQ: [string, string][] = [
   ['What happens when I upload a contract?', 'netbyfriday reads it and suggests the terms: fee, payment terms, usage rights, exclusivity and deliverables, each shown with the contract wording it came from. You check and edit them before anything is saved. The file is stored privately in your workspace. It isn’t legal advice.'],
   ['Does netbyfriday do my taxes?', 'No. The Taxes page shows what you’ve received, your expenses and how much to keep aside at a rate you choose, plus the quarterly estimated-tax dates and which payers are likely to send a 1099. It’s for planning and for your accountant, not tax advice, and nothing is filed or paid for you.'],
   ['Can I send invoices from netbyfriday?', 'Yes. Each invoice gets a private link the brand can view and download, and the message opens in your own email app, ready to send. netbyfriday doesn’t email brands on your behalf.'],
-  ['How do I get access?', 'netbyfriday is in a private beta. Join the waitlist and we’ll send you an invite code when a spot opens.']
+  ['How do I get access?', 'netbyfriday is in a private beta. Request early access and we’ll send you an invite code when a spot opens.']
 ];
 
 export default function Home() {
@@ -55,13 +54,14 @@ export default function Home() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <section className={`${wrap} grid items-center gap-16 py-[clamp(48px,7vw,96px)] min-[1120px]:grid-cols-[minmax(0,1.02fr)_minmax(0,1fr)]`}>
         <div className="flex flex-col gap-7">
-          <span className={`flex h-9 w-fit items-center gap-2.5 rounded-full border border-[#E4F28A] bg-[#F3FFC4] px-4 ${eyebrow}`}><span className="h-2 w-2 rotate-45 bg-plum" />The creator business platform</span>
-          <h1 className="text-[clamp(46px,6.6vw,92px)] font-extrabold leading-[.98] tracking-[-.045em] min-[1120px]:text-[clamp(46px,5.2vw,78px)]">Run your creator business <span className="nbf-hl">like a business.</span></h1>
-          <p className="max-w-[560px] text-[clamp(17px,1.6vw,20px)] leading-[1.55] text-[#4A2A45]">Brand deals, contacts, deliverables, invoices and payment terms, connected in one workspace. Plus an AI Advisor that answers from your own records. Because creating content is only part of the job.</p>
+          <span className={`flex min-h-9 w-fit max-w-full items-center gap-2.5 rounded-full border border-[#E4F28A] bg-[#F3FFC4] px-4 py-1.5 ${eyebrow} max-[480px]:tracking-[.1em]`}><span className="h-2 w-2 rotate-45 bg-plum" />Your influence has a business side.</span>
+          <h1 className="text-[clamp(34px,9vw,92px)] font-extrabold leading-[.98] tracking-[-.045em] min-[1120px]:text-[clamp(46px,5.2vw,78px)]">Meet the workspace that <span className="nbf-hl">keeps it together.</span></h1>
+          <p className="max-w-[560px] text-[clamp(17px,1.6vw,20px)] leading-[1.55] text-[#4A2A45]">Manage brand partnerships, invoices, deadlines, contacts, and revenue in one place, with an AI Advisor that helps you understand your business and figure out what’s next.</p>
           <div className="flex flex-wrap gap-3">
-            <Link href="/waitlist" className="flex h-14 items-center gap-2 rounded-[14px] bg-plum px-7 text-[17px] font-bold text-bg transition hover:-translate-y-0.5 hover:shadow-[0_10px_30px_rgba(50,21,47,.25)]">Get Started Free <span aria-hidden>→</span></Link>
+            <Link href="/waitlist" className="flex h-14 items-center gap-2 rounded-[14px] bg-plum px-7 text-[17px] font-bold text-bg transition hover:-translate-y-0.5 hover:shadow-[0_10px_30px_rgba(50,21,47,.25)]">Get Early Access <span aria-hidden>→</span></Link>
             <Link href="#product" className="flex h-14 items-center rounded-[14px] border-[1.5px] border-plum px-7 text-[17px] font-bold">Explore the Platform</Link>
           </div>
+          <p className="-mt-3 max-w-[520px] text-[14px] leading-snug text-sub">Private beta. We’re inviting a small group of creators to help shape NETBYFRIDAY.</p>
           <div className="grid grid-cols-3 border-t border-line2 pt-5">{[['Manage brand deals', 'Pitch to paid'], ['Track every invoice', 'NET30, 45, 60'], ['Grow with clarity', 'Insights from your data']].map(([a, b], i) =>
             <div key={a} className={`px-3 first:pl-0 ${i ? 'border-l border-line2' : ''}`}><div className="text-[15px] font-extrabold leading-tight">{a}</div><div className="text-[13px] text-muted">{b}</div></div>)}</div>
         </div>
@@ -193,9 +193,9 @@ export default function Home() {
 
       <section id="pricing" className={`${wrap} ${sec}`}><Reveal>
         <div className={eyebrow}>Pricing</div>
-        <h2 className={`${h2} mt-3`}>Start free. Grow into it.</h2>
-        <p className="mt-3 text-sm font-semibold text-muted">{ILLUSTRATIVE_LABEL}</p>
-        <div className="mt-10"><PricingCards plans={PLANS} /></div>
+        <h2 className={`${h2} mt-3`}>Free during private beta.</h2>
+        <p className="mt-3 max-w-[640px] text-[17px] leading-relaxed text-[#4A2A45]">Founding-member pricing will be announced before paid access begins.</p>
+        <div className="mt-10"><PricingCards /></div>
       </Reveal></section>
 
       <section id="faq" className={`${wrap} pb-[clamp(72px,10vw,136px)]`}><Reveal>
@@ -206,7 +206,7 @@ export default function Home() {
       <section className={`${wrap} pb-[clamp(72px,10vw,136px)]`}>
         <div className="rounded-[36px] bg-plum px-8 py-16 text-center text-bg">
           <h2 className={`${h2} mx-auto max-w-[900px]`}>Your influence is the business. <em className="text-chartreuse">Start treating it like one.</em></h2>
-          <div className="mt-8 flex flex-wrap justify-center gap-3"><Link href="/waitlist" className="flex h-14 items-center gap-2 rounded-[14px] bg-chartreuse px-7 text-[17px] font-bold text-plum transition hover:-translate-y-0.5">Get Started Free <span aria-hidden>→</span></Link>
+          <div className="mt-8 flex flex-wrap justify-center gap-3"><Link href="/waitlist" className="flex h-14 items-center gap-2 rounded-[14px] bg-chartreuse px-7 text-[17px] font-bold text-plum transition hover:-translate-y-0.5">Get Early Access <span aria-hidden>→</span></Link>
             <Link href="#product" className="flex h-14 items-center rounded-[14px] border-[1.5px] border-bg px-7 text-[17px] font-bold">Explore the platform</Link></div>
         </div>
       </section>

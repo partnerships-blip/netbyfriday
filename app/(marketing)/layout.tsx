@@ -19,7 +19,7 @@ export default async function MarketingLayout({ children }: { children: React.Re
   try { signedIn = !!(await createClient().auth.getUser()).data.user; } catch { /* public page; treat as signed out */ }
   const cols: [string, [string, string][]][] = [
     ['Product', [['Features', '/#product'], ['How it works', '/#how'], ['Pricing', '/pricing'], ['AI Advisor', '/#advisor']]],
-    ['Company', [['Our story', '/about'], ['FAQ', '/#faq'], ['Join the waitlist', '/waitlist'], ['Contact', `mailto:${SITE.contactEmail}`], ['Log in', '/login']]],
+    ['Company', [['Our story', '/about'], ['FAQ', '/#faq'], ['Get early access', '/waitlist'], ['Contact', `mailto:${SITE.contactEmail}`], ['Log in', '/login']]],
     ['Legal', [['Privacy', '/privacy'], ['Terms', '/terms']]]
   ];
   return (

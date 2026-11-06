@@ -13,7 +13,7 @@ export function siteSample() {
   const lumiere = i.deals.find(x => x.id === 'demo-d1')!;
   const delta = m.prevMonthCents && m.revenueByMonth[9].totalCents ? Math.round((m.prevMonthCents - m.revenueByMonth[9].totalCents) / m.revenueByMonth[9].totalCents * 100) : 0;
   const first6 = m.revenueByMonth.slice(0, 6).reduce((a: number, x: any) => a + x.totalCents, 0), last6 = m.revenueByMonth.slice(5, 11).reduce((a: number, x: any) => a + x.totalCents, 0);
-  const evidence = (e: string) => (e === 'verified' ? 'Verified' : e === 'estimate' ? 'Estimate' : e === 'suggested' ? 'Suggestion' : 'Insufficient data');
+  const evidence = (e: string) => (e === 'verified' ? 'From your records' : e === 'estimate' ? 'Estimate' : e === 'suggested' ? 'Suggestion' : 'Insufficient data');
   const brightline = m.overdueInvoices[0];
   // Contract demo: the sample creator's Glow Season agreement. The "contract" text is written from the same record the
   // extracted terms come from, so the demo can't show a term the contract doesn't contain.
@@ -55,7 +55,7 @@ export function siteSample() {
     contract, taxes, invoiceLink,
     firstName: d.profile.displayName.split(' ')[0],
     stats: [
-      { label: 'Received, 12 months', value: $(m.trailing12Cents), pill: 'Verified' },
+      { label: 'Received, 12 months', value: $(m.trailing12Cents), pill: 'From your records' },
       { label: 'Pending (NET)', value: $(m.outstandingCents), pill: `${m.openInvoices.length} invoices` },
       { label: 'Active deals', value: String(m.active.length + m.pipeline.length), pill: `${m.active.length} in production` },
       { label: monthLabel(m.months[10], 'long').split(' ')[0], value: $(m.prevMonthCents), pill: `${delta >= 0 ? '↑' : '↓'} ${Math.abs(delta)}%` }
@@ -69,9 +69,9 @@ export function siteSample() {
     months: m.revenueByMonth.map((x: any) => ({ label: monthLabel(x.month), value: $(x.totalCents), cents: x.totalCents })) as { label: string; value: string; cents: number }[],
     total12: $(m.trailing12Cents), growth: first6 ? `${last6 >= first6 ? '+' : ''}${Math.round((last6 - first6) / first6 * 100)}% vs. the prior six months` : '',
     tiles: [
-      { label: 'Repeat clients', value: `${repeat} of ${brandsAll.length}`, sub: 'Brands that booked more than once', pill: 'Verified' },
-      { label: 'Payment status', value: $(m.outstandingCents), sub: `${m.overdueInvoices.length} overdue · ${m.openInvoices.length - m.overdueInvoices.length} not yet due`, pill: 'Verified' },
-      { label: 'Pipeline', value: $(m.pipelineCents), sub: 'Unconfirmed deals. Never counted as revenue.', pill: 'Verified' },
+      { label: 'Repeat clients', value: `${repeat} of ${brandsAll.length}`, sub: 'Brands that booked more than once', pill: 'From your records' },
+      { label: 'Payment status', value: $(m.outstandingCents), sub: `${m.overdueInvoices.length} overdue · ${m.openInvoices.length - m.overdueInvoices.length} not yet due`, pill: 'From your records' },
+      { label: 'Pipeline', value: $(m.pipelineCents), sub: 'Unconfirmed deals. Never counted as revenue.', pill: 'From your records' },
       { label: 'Expected next 8 weeks', value: $(m.expected8wCents), sub: 'Open invoices by due date. Brands decide when they actually pay.', pill: 'Projection' }
     ],
     deliverables: lumiere.deliverables.slice(0, 3).map(x => ({ name: x.name, status: x.status })), campaign: lumiere.campaign,

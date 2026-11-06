@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { AppIcon } from '../Brand';
 
 const STAGE_BG: Record<string, string> = { in_progress: '#DFFF43', paid: '#E3EEE5', lead: '#EAE5F7', pitching: '#EAE5F7', negotiating: '#EAE5F7' };
-const EV_BG: Record<string, string> = { Verified: '#E3EEE5', Estimate: '#F5ECD8', Suggestion: '#F3FFC4' };
+const EV_BG: Record<string, string> = { 'From your records': '#E3EEE5', Estimate: '#F5ECD8', Suggestion: '#F3FFC4' };
 export function HeroPreview({ s }: { s: any }) {
   const [tab, setTab] = useState<'home' | 'deals' | 'money' | 'insights'>('home');
   const max = Math.max(1, ...s.months.slice(5, 11).map((x: any) => x.cents));

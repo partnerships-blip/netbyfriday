@@ -1,14 +1,22 @@
 import Link from 'next/link';
-import type { Plan } from '@/lib/billing/plans';
-export function PricingCards({ plans }: { plans: Plan[] }) {
+import { BETA_OFFER } from '@/lib/billing/plans';
+// During the private beta the site shows one offer: free. Illustrative paid tiers (PLANS) stay unpublished until prices are approved.
+export function PricingCards() {
   return (
-    <div className="grid gap-4 min-[860px]:grid-cols-3">{plans.map(p => (
-      <div key={p.key} className={`flex flex-col gap-5 rounded-[28px] p-[30px] ${p.recommended ? 'bg-plum text-bg' : 'border border-line bg-white'}`}>
-        <div className="flex items-center justify-between"><span className="text-[22px] font-extrabold tracking-tight">{p.name}</span>{p.recommended && <span className="rounded-full bg-chartreuse px-2.5 py-0.5 text-xs font-extrabold text-plum">Recommended</span>}</div>
-        <div><span className="text-[52px] font-extrabold leading-none tracking-[-.04em]">{p.price}</span> <span className="text-sm opacity-75">{p.per}</span></div>
-        <p className="text-[15px] leading-relaxed opacity-85">{p.desc}</p>
-        <ul className="flex flex-1 flex-col gap-2">{p.features.map(f => <li key={f} className="flex gap-2 text-[15px]"><span className={`mt-2 h-2 w-2 flex-none rotate-45 ${p.recommended ? 'bg-chartreuse' : 'bg-plum'}`} />{f}</li>)}</ul>
-        <Link href="/waitlist" className={`flex h-12 items-center justify-center rounded-[14px] text-[16px] font-bold transition hover:-translate-y-0.5 ${p.recommended ? 'bg-chartreuse text-plum' : 'bg-plum text-bg'}`}>{p.cta}</Link>
-      </div>))}</div>
+    <div className="grid gap-4 min-[860px]:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+      <div className="flex flex-col gap-5 rounded-[28px] bg-plum p-[clamp(24px,3vw,36px)] text-bg">
+        <span className="w-fit rounded-full bg-chartreuse px-3 py-1 text-[12px] font-bold text-plum">Founding creator beta</span>
+        <div className="text-[clamp(40px,5vw,60px)] font-extrabold leading-[1] tracking-[-.04em]">{BETA_OFFER.headline}</div>
+        <ul className="grid gap-2 sm:grid-cols-2">{BETA_OFFER.includes.map(f => <li key={f} className="flex gap-2 text-[15px]"><span className="mt-2 h-2 w-2 flex-none rotate-45 bg-chartreuse" />{f}</li>)}</ul>
+        <Link href="/waitlist" className="flex h-12 w-fit items-center justify-center rounded-[14px] bg-chartreuse px-6 text-[16px] font-bold text-plum transition hover:-translate-y-0.5">Get Early Access</Link>
+      </div>
+      <div className="flex flex-col justify-between gap-5 rounded-[28px] border border-line bg-white p-[clamp(24px,3vw,36px)]">
+        <div className="flex flex-col gap-3">
+          <span className="font-mono text-[12px] uppercase tracking-[.14em] text-muted">After the beta</span>
+          <p className="text-[22px] font-extrabold leading-snug tracking-[-.02em]">{BETA_OFFER.note}</p>
+        </div>
+        <p className="text-[14px] leading-relaxed text-sub">Beta creators get a say in what the paid plans include, and the first look at founding-member pricing.</p>
+      </div>
+    </div>
   );
 }

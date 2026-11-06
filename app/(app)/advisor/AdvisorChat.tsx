@@ -23,7 +23,7 @@ function Reply({ r, live, demo, onDraft }: { r: AdvisorReply; live: boolean; dem
         <div key={i} className="flex flex-col gap-1 text-sm leading-relaxed">
           <div className="tnum flex gap-2.5"><span className="text-faint">—</span><span className={f.verified ? '' : 'text-sub line-through decoration-faint'}>{f.statement}</span></div>
           <div className="ml-5 flex flex-wrap items-center gap-1.5">
-            {f.verified ? <Pill tone="ok">Verified</Pill> : <Pill tone="danger">Not verified: {f.reason}</Pill>}
+            {f.verified ? <Pill tone="ok">Matches your records</Pill> : <Pill tone="danger">Doesn’t match your records: {f.reason}</Pill>}
             {f.evidenceLabels.map((l, k) => <span key={k} className="rounded border border-line px-1.5 py-px font-mono text-[10px] text-muted">{l}</span>)}
             {f.calculation && <span className="font-mono text-[11px] text-sub">{f.calculation}</span>}
           </div>

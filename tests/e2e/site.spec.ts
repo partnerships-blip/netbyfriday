@@ -10,14 +10,14 @@ test.describe.serial('public site and waitlist', () => {
   test('home page renders figures calculated from the sample records', async ({ page }) => {
     await page.goto('/');
     await expect(page).toHaveURL(/\/$/);                                         // signed-out visitors are not sent to /login
-    await expect(page.getByRole('heading', { level: 1 })).toContainText('Run your creator business');
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('Meet the workspace that keeps it together.');
     await page.getByRole('button', { name: 'money', exact: true }).first().click();       // hero preview tabs work
     await expect(page.getByText(formatCents(m.outstandingCents)).first()).toBeVisible();
     await page.getByRole('button', { name: /NET45/ }).first().click();                   // NET45 timeline
     await expect(page.getByText('Then you wait.')).toBeVisible();
     await page.getByRole('button', { name: /How much revenue is still outstanding/ }).click();   // Advisor sample answer
     await expect(page.locator('#advisor').getByText(new RegExp(`${formatCents(m.outstandingCents).replace('$', '\\$')} across ${m.openInvoices.length} invoices`))).toBeVisible();
-    await expect(page.getByText('Illustrative plans · pricing is not final').first()).toBeVisible();
+    await expect(page.getByText('Founding-member pricing will be announced before paid access begins.').first()).toBeVisible();
     await expect(page.getByText('does not control when brands pay').first()).toBeVisible();
     await expect(page.getByRole('link', { name: /Read the full story/ })).toBeVisible();           // founder story excerpt
     for (const p of ['/pricing', '/privacy', '/terms']) { await page.goto(p); await expect(page.getByRole('heading', { level: 1 })).toBeVisible(); }
@@ -38,7 +38,7 @@ test.describe.serial('public site and waitlist', () => {
       await page.getByLabel('Name').fill('Wren Waitlist');
       await page.getByRole('checkbox').check();
       await page.waitForTimeout(1700);                                              // forms submitted instantly are treated as bots
-      await page.getByRole('button', { name: 'Join the waitlist' }).click();
+      await page.getByRole('button', { name: 'Request early access' }).click();
       await expect(page.getByRole('status')).toContainText(expected);
     }
   });

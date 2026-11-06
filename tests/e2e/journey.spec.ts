@@ -96,8 +96,8 @@ test.describe.serial('core creator journey', () => {
     if (!process.env.E2E_REAL_AI) {
       await expect(page.getByText('Revenue received this month is $2,000.')).toBeVisible();
       await expect(page.getByText('Unpaid invoice balances total $3,000.')).toBeVisible();
-      await expect(page.getByText('Verified', { exact: true }).first()).toBeVisible();
-      await expect(page.getByText(/Not verified: Contains an amount not found/)).toBeVisible(); // the $999,999 claim is rejected
+      await expect(page.getByText('Matches your records', { exact: true }).first()).toBeVisible();
+      await expect(page.getByText(/Doesn’t match your records: Contains an amount not found/)).toBeVisible(); // the $999,999 claim is rejected
     }
     await shot(page, '2-advisor');
     await page.goto('/money'); await shot(page, '3-invoices');

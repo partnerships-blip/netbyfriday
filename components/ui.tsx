@@ -28,7 +28,7 @@ export function Pill({ tone = 'neutral', children, className }: { tone?: keyof t
   return <span className={cx('inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium', TONE[tone], className)}>{children}</span>;
 }
 export const EVIDENCE: Record<string, { label: string; tone: keyof typeof TONE }> = {
-  verified: { label: 'Verified from your records', tone: 'ok' }, estimate: { label: 'Estimate', tone: 'warn' },
+  verified: { label: 'Calculated from your records', tone: 'ok' }, estimate: { label: 'Estimate', tone: 'warn' },
   suggested: { label: 'Suggested opportunity', tone: 'accent' }, insufficient: { label: 'Insufficient data', tone: 'neutral' }
 };
 export const inputCls = 'h-10 w-full rounded-[10px] border border-line2 bg-white px-3 text-sm font-normal text-ink outline-none focus:border-ink';

@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { joinWaitlist, type WaitlistState } from './actions';
 
 const input = 'h-12 w-full rounded-xl border border-line2 bg-white px-4 text-[16px] outline-none focus:border-plum';
-function Submit() { const { pending } = useFormStatus(); return <button disabled={pending} className="h-14 rounded-[14px] bg-plum px-7 text-[17px] font-bold text-bg transition hover:-translate-y-0.5 disabled:opacity-60">{pending ? 'Joining…' : 'Join the waitlist'}</button>; }
+function Submit() { const { pending } = useFormStatus(); return <button disabled={pending} className="h-14 rounded-[14px] bg-plum px-7 text-[17px] font-bold text-bg transition hover:-translate-y-0.5 disabled:opacity-60">{pending ? 'Joining…' : 'Request early access'}</button>; }
 export function WaitlistForm() {
   const [state, action] = useFormState<WaitlistState, FormData>(joinWaitlist, {});
   const [startedAt] = useState(() => Date.now());

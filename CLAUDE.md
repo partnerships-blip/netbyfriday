@@ -20,7 +20,7 @@ You're building NETBYFRIDAY 1.0: a structured business workspace where creators 
   - It never sends anything and never changes financial records.
   - It may propose non-financial changes, which run only after the creator clicks Confirm, through the normal server actions.
   - Keep the per-user hourly cap.
-- Never claim NETBYFRIDAY speeds up or guarantees payment. No fake testimonials or customer numbers. Prices come from `lib/billing/plans.ts` and are labeled "Illustrative".
+- Never claim NETBYFRIDAY speeds up or guarantees payment. No fake testimonials or customer numbers. The public site shows only `BETA_OFFER` from `lib/billing/plans.ts` ("Free during private beta"). `PLANS` stay unpublished until the founder approves prices; if shown, they are labeled "Illustrative".
 - Never seed demo data into production.
 - A feature is done when it persists to Supabase, is authorized, handles errors and empty states, and has a passing test.
 
