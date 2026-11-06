@@ -78,16 +78,25 @@ export function siteSample() {
     repeatPct: Math.round(repeat / brandsAll.length * 100) + '%',
     roles: { lateDays: brightline?.daysLate ?? 0, lateNumber: brightline?.number ?? 'INV-2041' },
     // The website's Advisor section shows pre-written sample answers built from the same records (no public AI endpoint).
-    advisor: [
-      { q: 'Who should I follow up with?', answer: `${m.followUps.length} follow-ups are waiting, starting with ${brightline ? `${brightline.clientName} on ${brightline.number}` : 'your oldest invoice'}.`,
-        facts: m.followUps.slice(0, 3).map((f: any) => `${f.who}: ${f.reason}`), next: ['Send a friendly payment reminder (draft ready to edit)', 'Follow up on the unanswered pitch with one new idea'] },
-      { q: 'How much revenue is still outstanding?', answer: `${$(m.outstandingCents)} across ${m.openInvoices.length} invoices, of which ${$(m.overdueCents)} is past due.`,
-        facts: [...m.openInvoices].sort((a: any, b: any) => (a.dueOn < b.dueOn ? -1 : 1)).slice(0, 3).map((v: any) => `${v.number} · ${v.clientName} · ${$(v.balanceCents)} ${v.daysLate ? `${v.daysLate} days overdue` : `due ${shortDate(v.dueOn)}`}`),
-        next: ['Confirm each billing contact a week before the due date', 'Send the overdue reminder first'] },
-      { q: "What's on my plate this week?", answer: `${m.agenda.length} things have dates in the next 7 days or are already late.`,
-        facts: m.agenda.slice(0, 4).map((a: any) => `${shortDate(a.date)} · ${a.text}`), next: ['Upload the Reel draft before Thursday', 'Add the Halcyon travel booking as a task'] },
-      { q: 'Am I on track for my monthly goal?', answer: `Not yet: ${$(m.thisMonthCents)} received so far this month against a ${$(i.goals.monthlyCents)} goal.`,
-        facts: [`Goal ${$(i.goals.monthlyCents)}`, `Received this month ${$(m.thisMonthCents)}`, `Invoices due before month end are expected, not received`], next: ['Close one pipeline deal or follow up on invoices due this month'] }
-    ]
+    advisor: (() => {
+      const brandOf = new Map(i.deals.map(d => [d.id, d.brandName]));
+      const owed = [...m.openInvoices].sort((a: any, b: any) => (b.daysLate - a.daysLate) || (a.dueOn < b.dueOn ? -1 : 1));
+      const late = owed.find((v: any) => v.daysLate > 0);
+      const up = m.nextDeliverables.filter((x: any) => x.dueOn >= m.today).slice(0, 4);
+      return [
+        { q: 'Who owes me money?', answer: `${owed.length} brands have open invoices: ${$(m.outstandingCents)} in total, ${$(m.overdueCents)} of it past due.`,
+          facts: owed.slice(0, 3).map((v: any) => `${v.clientName} · ${v.number} · ${$(v.balanceCents)} ${v.daysLate ? `${v.daysLate} days overdue` : `due ${shortDate(v.dueOn)}`}`),
+          next: ['Send the overdue reminder first (draft ready to edit)', 'Confirm the billing contact before the next due date'] },
+        { q: 'What deliverables do I have coming up?', answer: `${up.length} deliverables are due next, the first on ${up[0] ? shortDate(up[0].dueOn) : 'no date yet'}.`,
+          facts: up.map((x: any) => `${shortDate(x.dueOn)} · ${x.name} · ${brandOf.get(x.dealId) ?? ''}`), next: ['Block time to film before the first due date', 'Ask for approval on drafts already in review'] },
+        { q: 'Which brands should I follow up with?', answer: `${m.followUps.length} follow-ups are waiting, starting with ${m.followUps[0]?.who ?? 'your oldest invoice'}.`,
+          facts: m.followUps.slice(0, 3).map((f: any) => `${f.who}: ${f.reason}`), next: ['Follow up on the unanswered pitch with one new idea', 'Check in with past brands before their next campaign'] },
+        { q: 'Draft a payment follow-up.', answer: late
+            ? `“Hi ${late.clientName} team, a quick note that ${late.number} for ${$(late.balanceCents)} was due ${shortDate(late.dueOn)}. Could you confirm when it’s scheduled for payment? Happy to resend the invoice link. Thank you!”`
+            : 'Nothing is overdue in these records, so there’s no follow-up to draft.',
+          facts: late ? [`${late.number} · ${$(late.balanceCents)} · ${late.daysLate} days overdue`, `Terms: ${late.terms}`] : [],
+          next: ['Edit the draft, then send it from your own email', 'netbyfriday never sends anything for you'] }
+      ];
+    })()
   };
 }

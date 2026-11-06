@@ -7,6 +7,7 @@ import { AdvisorDemo } from '@/components/marketing/AdvisorDemo';
 import { ContractDemo } from '@/components/marketing/ContractDemo';
 import { Reveal } from '@/components/marketing/Reveal';
 import { PricingCards } from '@/components/marketing/PricingCards';
+import { CreatorStories } from '@/components/marketing/CreatorStories';
 import { DELIVERABLE_LABEL } from '@/lib/brand';
 import { founderStory } from '@/lib/marketing/story';
 import { SITE } from '@/lib/site';
@@ -71,6 +72,13 @@ export default function Home() {
       <div className="overflow-hidden bg-plum py-[26px]" aria-hidden><div className="nbf-marquee flex w-max">{[...words, ...words].map((w, i) =>
         <span key={i} className={`inline-flex items-center gap-7 whitespace-nowrap pr-7 text-[clamp(22px,3vw,34px)] font-extrabold tracking-[-.03em] ${w.startsWith('NET') ? 'text-chartreuse' : 'text-bg'}`}>{w}<span className="inline-block h-2.5 w-2.5 rotate-45 bg-[#6C4B67]" /></span>)}</div></div>
 
+      <section id="advisor" className={`bg-lavender ${sec}`}><div className={wrap}><Reveal>
+        <div className={eyebrow}>AI Advisor</div>
+        <h2 className={`${h2} mt-3 max-w-[900px]`}>Ask your business anything. <em className="text-[#6C4B67]">Get answers from your records.</em></h2>
+        <p className="mt-5 max-w-[720px] text-[18px] leading-relaxed text-[#4A2A45]">Try it on a sample creator’s records. Every answer below is sample data, calculated the way the product does it. In your workspace, the Advisor answers from your own partnerships, invoices and tasks, and nothing is sent or changed without your approval.</p>
+        <div className="mt-10"><AdvisorDemo samples={s.advisor} /></div>
+      </Reveal></div></section>
+
       <section className={`${wrap} ${sec}`}><Reveal>
         <h2 className={`${h2} max-w-[900px]`}>You&apos;re the talent. The accountant. The negotiator. The entire team.</h2>
         <p className="mt-5 max-w-[720px] text-[18px] leading-relaxed text-[#4A2A45]">Independent creators run several brand relationships at once, each with its own deliverables, deadlines, invoice and payment terms. Most of it lives across spreadsheets, email threads, DMs and calendar invites, with nothing connecting them.</p>
@@ -83,19 +91,32 @@ export default function Home() {
 
       <section id="product" className={`bg-lavender ${sec}`}><div className={wrap}><Reveal>
         <div className={eyebrow}>The platform</div>
-        <h2 className={`${h2} mt-3 max-w-[900px]`}>Everything behind the content. Finally together.</h2>
-        <div className="mt-10 grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4">
-          {[
-            ['Brand deal management', 'Every partnership from first pitch to final payment, on a board or in a table.', <div key="a" className="flex flex-col gap-1.5">{s.pipeline.slice(1, 6).map(p => <div key={p.label} className="flex items-center gap-2 text-xs"><span className="w-24 font-semibold">{p.label}</span><div className="h-2 flex-1 rounded bg-[#F0EBF2]"><div className="h-full rounded bg-plum" style={{ width: Math.max(8, p.n * 25) + '%' }} /></div><span className="w-4 text-right">{p.n}</span></div>)}</div>],
-            ['Invoice & payment tracking', 'Send each invoice as a private link. Partial payments, NET terms and what is overdue, calculated for you.', <div key="b"><div className="text-3xl font-extrabold tracking-tight">{s.outstanding}</div><div className="text-xs text-muted">outstanding</div>{s.terms.map(t => <div key={t.terms} className="mt-1.5 flex justify-between text-xs"><span className="rounded-full bg-[#F3FFC4] px-2 font-bold">{t.terms}</span><span>{t.open}</span></div>)}</div>],
-            ['Content & deliverables', 'Deadlines, drafts in review and approvals for every campaign, with a calendar.', <div key="c"><div className="text-sm font-extrabold">{s.campaign}</div>{s.deliverables.map(x => <div key={x.name} className="mt-1.5 flex items-center justify-between rounded-lg border border-line px-2 py-1.5 text-xs"><span>{x.name}</span><span className="rounded-full bg-[#F3EEF4] px-1.5 font-semibold">{DELIVERABLE_LABEL[x.status]}</span></div>)}</div>],
-            ['Contacts & relationships', 'The people at each brand, linked to their partnerships, invoices and tasks.', <div key="d"><div className="text-4xl font-extrabold tracking-tight">{s.repeatPct}</div><div className="text-xs text-muted">of brands booked again</div><div className="mt-3 flex h-3 overflow-hidden rounded-full">{['#32152F', '#6C4B67', '#9A8396', '#C4B0C0', '#DFFF43'].map(c => <div key={c} className="flex-1" style={{ background: c }} />)}</div></div>],
-            ['Revenue intelligence', 'Revenue received, expected cash, payment-term patterns and client concentration.', <div key="e" className="flex h-full items-end gap-1">{s.months.map(m => <div key={m.label} className="flex-1 rounded-t bg-plum" style={{ height: Math.max(6, m.cents / Math.max(...s.months.map(x => x.cents)) * 120) }} />)}</div>],
-            ['AI business assistant', 'Answers from your own records, drafts follow-ups, and suggests next steps you confirm.', <div key="f" className="flex flex-col gap-2"><div className="ml-auto rounded-[12px_12px_4px_12px] bg-plum px-3 py-2 text-xs text-bg">How much is still outstanding?</div><div className="rounded-xl bg-[#F3EEF4] px-3 py-2 text-xs">{s.advisor[1].answer} <span className="font-bold">Sample answer.</span></div></div>]
-          ].map(([t, d, ui]) => (
-            <div key={t as string} className="flex flex-col rounded-[24px] bg-white p-3 transition hover:-translate-y-1 hover:shadow-[0_18px_40px_rgba(50,21,47,.1)]">
-              <div className="h-[200px] overflow-hidden rounded-[16px] bg-bg p-4">{ui}</div>
-              <div className="px-3 pb-3 pt-5"><div className="text-[22px] font-extrabold tracking-[-.03em]">{t}</div><p className="mt-1.5 text-[15px] leading-relaxed text-sub">{d}</p></div>
+        <h2 className={`${h2} mt-3 max-w-[900px]`}>Organize. Understand. Grow.</h2>
+        <p className="mt-5 max-w-[720px] text-[18px] leading-relaxed text-[#4A2A45]">Everything behind the content, in one workspace, with the numbers worked out for you and an Advisor that helps you decide what’s next.</p>
+        <div className="mt-12 flex flex-col gap-12">
+          {([
+            { n: '01', word: 'Organize.', line: 'Everything behind the content. One workspace.', chips: ['Partnerships', 'Contracts', 'Invoices', 'Contacts', 'Tasks', 'Deliverables'], tone: 'bg-white', cards: [
+              ['Brand deal management', 'Every partnership from first pitch to final payment, on a board or in a table.', <div key="a" className="flex flex-col gap-1.5">{s.pipeline.slice(1, 6).map(p => <div key={p.label} className="flex items-center gap-2 text-xs"><span className="w-24 font-semibold">{p.label}</span><div className="h-2 flex-1 rounded bg-[#F0EBF2]"><div className="h-full rounded bg-plum" style={{ width: Math.max(8, p.n * 25) + '%' }} /></div><span className="w-4 text-right">{p.n}</span></div>)}</div>],
+              ['Content & deliverables', 'Deadlines, drafts in review and approvals for every campaign, with a calendar.', <div key="c"><div className="text-sm font-extrabold">{s.campaign}</div>{s.deliverables.map(x => <div key={x.name} className="mt-1.5 flex items-center justify-between rounded-lg border border-line px-2 py-1.5 text-xs"><span>{x.name}</span><span className="rounded-full bg-[#F3EEF4] px-1.5 font-semibold">{DELIVERABLE_LABEL[x.status]}</span></div>)}</div>],
+              ['Contacts & relationships', 'The people at each brand, linked to their partnerships, invoices and tasks.', <div key="d"><div className="text-4xl font-extrabold tracking-tight">{s.repeatPct}</div><div className="text-xs text-muted">of brands booked again</div><div className="mt-3 flex h-3 overflow-hidden rounded-full">{['#32152F', '#6C4B67', '#9A8396', '#C4B0C0', '#DFFF43'].map(c => <div key={c} className="flex-1" style={{ background: c }} />)}</div></div>]] },
+            { n: '02', word: 'Understand.', line: 'Know what you’ve earned, what’s owed, and what’s next.', chips: ['Revenue dashboard', 'Outstanding invoices', 'Payment terms', 'Upcoming payments', 'Financial history'], tone: 'bg-plum text-bg', cards: [
+              ['Invoice & payment tracking', 'Send each invoice as a private link. Partial payments, NET terms and what is overdue, calculated for you.', <div key="b"><div className="text-3xl font-extrabold tracking-tight">{s.outstanding}</div><div className="text-xs text-muted">outstanding</div>{s.terms.map(t => <div key={t.terms} className="mt-1.5 flex justify-between text-xs"><span className="rounded-full bg-[#F3FFC4] px-2 font-bold">{t.terms}</span><span>{t.open}</span></div>)}</div>],
+              ['Revenue intelligence', 'Revenue received, expected cash, payment-term patterns and client concentration.', <div key="e" className="flex h-full items-end gap-1">{s.months.map(m => <div key={m.label} className="flex-1 rounded-t bg-plum" style={{ height: Math.max(6, m.cents / Math.max(...s.months.map(x => x.cents)) * 120) }} />)}</div>]] },
+            { n: '03', word: 'Grow.', line: 'Make better business decisions with an AI Advisor that understands your records.', chips: ['Business questions', 'Payment follow-ups', 'Relationship insights', 'Weekly priorities', 'Drafting help'], tone: 'bg-chartreuse', cards: [
+              ['AI business assistant', 'Answers from your own records, drafts follow-ups, and suggests next steps you confirm.', <div key="f" className="flex flex-col gap-2"><div className="ml-auto rounded-[12px_12px_4px_12px] bg-plum px-3 py-2 text-xs text-bg">{s.advisor[0].q}</div><div className="rounded-xl bg-[#F3EEF4] px-3 py-2 text-xs">{s.advisor[0].answer} <span className="font-bold">Sample answer.</span></div></div>]] }
+          ] as { n: string; word: string; line: string; chips: string[]; tone: string; cards: [string, string, JSX.Element][] }[]).map(g => (
+            <div key={g.n} className="grid items-start gap-4 min-[1000px]:grid-cols-[minmax(0,.8fr)_minmax(0,2fr)]">
+              <div className={`flex flex-col gap-4 rounded-[24px] p-7 ${g.tone}`}>
+                <span className="font-mono text-[12px] font-semibold tracking-[.14em] opacity-70">{g.n}</span>
+                <h3 className="text-[clamp(34px,4vw,48px)] font-extrabold leading-none tracking-[-.04em]">{g.word}</h3>
+                <p className="text-[17px] font-semibold leading-snug">{g.line}</p>
+                <ul className="flex flex-wrap gap-1.5" aria-label={`${g.word} includes`}>{g.chips.map(c => <li key={c} className={`rounded-full px-3 py-1 text-[13px] font-semibold ${g.tone.includes('plum') ? 'bg-[rgba(250,247,243,.12)]' : 'bg-[rgba(50,21,47,.07)]'}`}>{c}</li>)}</ul>
+              </div>
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-4">{g.cards.map(([t, d, ui]) => (
+                <div key={t} className="flex flex-col rounded-[24px] bg-white p-3 transition hover:-translate-y-1 hover:shadow-[0_18px_40px_rgba(50,21,47,.1)]">
+                  <div className="h-[200px] overflow-hidden rounded-[16px] bg-bg p-4">{ui}</div>
+                  <div className="px-3 pb-3 pt-5"><div className="text-[22px] font-extrabold tracking-[-.03em]">{t}</div><p className="mt-1.5 text-[15px] leading-relaxed text-sub">{d}</p></div>
+                </div>))}</div>
             </div>))}
         </div>
       </Reveal></div></section>
@@ -170,26 +191,43 @@ export default function Home() {
         <p className="mt-4 text-[13px] text-muted">All figures on this page are calculated from a fictional sample creator&apos;s records.</p>
       </Reveal></section>
 
-      <section id="advisor" className={`bg-lavender ${sec}`}><div className={wrap}><Reveal>
-        <div className={eyebrow}>AI Advisor</div>
-        <h2 className={`${h2} mt-3 max-w-[900px]`}>Business advice that actually knows your business.</h2>
-        <p className="mt-5 max-w-[720px] text-[18px] leading-relaxed text-[#4A2A45]">Answers come from your own records, with the numbers shown and suggestions labeled as suggestions. Nothing is ever sent or changed without your approval.</p>
-        <div className="mt-10"><AdvisorDemo samples={s.advisor} /></div>
-      </Reveal></div></section>
 
       <section id="story" className={`${wrap} ${sec}`}><Reveal>
         <div className="grid items-start gap-10 min-[860px]:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
           <div>
             <div className={eyebrow}>Our story</div>
-            <h2 className={`${h2} mt-3`}>Built by a creator who still sends the invoices.</h2>
+            <h2 className={`${h2} mt-3`}>Built by a creator who needed it herself.</h2>
+            <p className="mt-4 max-w-[460px] text-[17px] leading-relaxed text-[#4A2A45]">NETBYFRIDAY was created by a full-time creator who managed the partnerships, invoices, deadlines and brand relationships herself, and built the workspace she wanted.</p>
           </div>
           <div className="flex flex-col gap-5 text-[18px] leading-[1.7] text-[#4A2A45]">
             <blockquote className="rounded-[24px] bg-plum px-7 py-6 text-[clamp(22px,2.4vw,28px)] font-extrabold leading-snug tracking-[-.03em] text-bg">{quote}</blockquote>
             <p>{why}</p><p>{friday}</p>
-            <Link href="/about" className="w-fit text-[16px] font-bold underline underline-offset-4">Read the full story →</Link>
+            <div className="flex flex-wrap gap-x-6 gap-y-2"><Link href="/about" className="w-fit text-[16px] font-bold underline underline-offset-4">Read the full story →</Link><Link href="/founder-files" className="w-fit text-[16px] font-bold underline underline-offset-4">The Founder Files →</Link></div>
           </div>
         </div>
       </Reveal></section>
+
+      <section id="beta" className={`bg-lavender ${sec}`}><div className={wrap}><Reveal>
+        <div className={eyebrow}>The Founding Creator beta</div>
+        <h2 className={`${h2} mt-3 max-w-[900px]`}>Help shape the workspace <em className="text-[#6C4B67]">you’ll run your business on.</em></h2>
+        <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:[&>*:last-child]:col-span-2 min-[1180px]:grid-cols-5 min-[1180px]:[&>*:last-child]:col-span-1">
+          {[
+            ['Who it’s for', ['Working creators who handle their own brand partnerships, alone or with a manager.', 'Anyone tired of tracking deals, invoices and deadlines across spreadsheets, email and DMs.']],
+            ['What you can use today', ['Partnerships, deliverables, contacts and tasks', 'Contract upload with the terms read for you', 'Invoices with NET terms and private invoice links', 'Taxes: set-aside and quarterly dates', 'The AI Advisor, and CSV import from your sheets']],
+            ['What we ask of you', ['Run your real business in it for a few weeks.', 'Tell us what’s confusing, broken or missing with the Feedback button in the app.', 'Founding creators get a say in what’s built next.']],
+            ['How invitations work', ['Request early access with a few details about your business.', 'We review every request and invite creators in small groups.', 'Your invite arrives by email with a personal code.']],
+            ['Still in development', ['A weekly Friday Brief of what needs attention', 'Deeper brand relationship insights', 'Founding-member pricing, announced before paid access begins']]
+          ].map(([t, items]) => (
+            <div key={t as string} className="flex flex-col gap-3 rounded-[24px] bg-white p-6">
+              <h3 className="text-[20px] font-extrabold tracking-[-.02em]">{t as string}</h3>
+              <ul className="flex flex-col gap-2">{(items as string[]).map(x => <li key={x} className="flex gap-2.5 text-[15px] leading-snug text-sub"><span aria-hidden className="mt-[7px] h-1.5 w-1.5 flex-none rotate-45 bg-plum" />{x}</li>)}</ul>
+            </div>))}
+        </div>
+        <div className="mt-8 flex flex-wrap items-center gap-4"><Link href="/waitlist" className="flex h-14 items-center gap-2 rounded-[14px] bg-plum px-7 text-[17px] font-bold text-bg transition hover:-translate-y-0.5">Get Early Access <span aria-hidden>→</span></Link>
+          <span className="max-w-[420px] text-[14px] leading-snug text-sub">Private beta. We’re inviting a small group of creators to help shape NETBYFRIDAY.</span></div>
+      </Reveal></div></section>
+
+      <CreatorStories wrap={wrap} sec={sec} eyebrow={eyebrow} h2={h2} />
 
       <section id="pricing" className={`${wrap} ${sec}`}><Reveal>
         <div className={eyebrow}>Pricing</div>

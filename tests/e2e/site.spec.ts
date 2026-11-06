@@ -15,11 +15,19 @@ test.describe.serial('public site and waitlist', () => {
     await expect(page.getByText(formatCents(m.outstandingCents)).first()).toBeVisible();
     await page.getByRole('button', { name: /NET45/ }).first().click();                   // NET45 timeline
     await expect(page.getByText('Then you wait.')).toBeVisible();
-    await page.getByRole('button', { name: /How much revenue is still outstanding/ }).click();   // Advisor sample answer
-    await expect(page.locator('#advisor').getByText(new RegExp(`${formatCents(m.outstandingCents).replace('$', '\\$')} across ${m.openInvoices.length} invoices`))).toBeVisible();
+    await page.getByRole('button', { name: /Who owes me money/ }).click();   // Advisor sample answer
+    await expect(page.locator('#advisor').getByText(new RegExp(`${formatCents(m.outstandingCents).replace('$', '\\$')} in total`))).toBeVisible();
+    await expect(page.locator('#advisor').getByText('Sample answer · fictional creator records')).toBeVisible();
+    for (const h of ['Organize.', 'Understand.', 'Grow.']) await expect(page.getByRole('heading', { name: h, exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Built by a creator who needed it herself.' })).toBeVisible();
+    await expect(page.locator('#beta').getByRole('heading', { name: 'How invitations work' })).toBeVisible();
+    await expect(page.locator('#stories')).toHaveCount(0);                                         // no stories until a creator consents
     await expect(page.getByText('Founding-member pricing will be announced before paid access begins.').first()).toBeVisible();
     await expect(page.getByText('does not control when brands pay').first()).toBeVisible();
     await expect(page.getByRole('link', { name: /Read the full story/ })).toBeVisible();           // founder story excerpt
+    await page.goto('/founder-files'); await expect(page.getByRole('heading', { level: 1 })).toHaveAccessibleName('The Founder Files.');   // public, no sign-in
+    await page.getByRole('link', { name: /Marked Paid should mean/ }).click();
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Marked Paid should mean the money is recorded');
     for (const p of ['/pricing', '/privacy', '/terms']) { await page.goto(p); await expect(page.getByRole('heading', { level: 1 })).toBeVisible(); }
     await expect(page.getByRole('link', { name: 'hello@netbyfriday.com' }).first()).toBeVisible();      // contact address on legal pages
     await page.goto('/about');
