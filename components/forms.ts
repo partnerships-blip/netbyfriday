@@ -1,15 +1,27 @@
 import type { FieldSpec } from './FormModal';
 import { STAGES } from '@/lib/finance/core.js';
-import { STREAM_LABEL } from '@/lib/brand';
+import { STREAM_LABEL, DELIVERABLE_LABEL } from '@/lib/brand';
+import { DEAL_TYPES, SCHEDULES, TRIGGERS } from '@/lib/deals';
 
 const stageOpts = STAGES.map(([v, l]) => ({ v, l }));
 const streamOpts = Object.entries(STREAM_LABEL).map(([v, l]) => ({ v, l }));
 
+export const deliverableFields: FieldSpec[] = [
+  { name: 'name', label: 'Deliverable', required: true, placeholder: '1 TikTok video' }, { name: 'platform', label: 'Platform', placeholder: 'TikTok' },
+  { name: 'status', label: 'Status', type: 'select', options: Object.entries(DELIVERABLE_LABEL).map(([v, l]) => ({ v, l })) },
+  { name: 'revisions', label: 'Revision rounds so far', type: 'number' },
+  { name: 'submitBy', label: 'Submit draft by', type: 'date' }, { name: 'submittedOn', label: 'Submitted on', type: 'date' },
+  { name: 'dueOn', label: 'Post by', type: 'date', required: true }, { name: 'publishedOn', label: 'Published on', type: 'date' },
+  { name: 'contentUrl', label: 'Link to the live post', placeholder: 'https://', full: true }, { name: 'notes', label: 'Notes', type: 'area' }
+];
 export const dealFields: FieldSpec[] = [
   { name: 'brand', label: 'Brand', required: true }, { name: 'campaign', label: 'Campaign' },
+  { name: 'dealType', label: 'Partnership type', type: 'select', options: DEAL_TYPES.map(([v, l]) => ({ v, l })) }, { name: 'stage', label: 'Stage', type: 'select', options: stageOpts },
   { name: 'agency', label: 'Agency' }, { name: 'contactName', label: 'Contact person' }, { name: 'contactEmail', label: 'Contact email', type: 'email' },
   { name: 'fee', label: 'Fee ($)', type: 'money' }, { name: 'feeIsEstimate', label: 'This fee is my estimate, not an offer', type: 'checkbox' },
-  { name: 'stage', label: 'Stage', type: 'select', options: stageOpts }, { name: 'paymentTerms', label: 'Payment terms', placeholder: 'Net 30' },
+  { name: 'giftedValue', label: 'Gifted product value ($, non-cash)', type: 'money' }, { name: 'commissionTerms', label: 'Commission', placeholder: '10% of sales via code' },
+  { name: 'paymentSchedule', label: 'Payment schedule', type: 'select', options: SCHEDULES.map(([v, l]) => ({ v, l })) }, { name: 'paymentTerms', label: 'Payment terms', placeholder: 'Net 30' },
+  { name: 'paymentTrigger', label: 'Payment clock starts', type: 'select', options: TRIGGERS.map(([v, l]) => ({ v, l })) }, { name: 'scheduleNote', label: 'Schedule details', placeholder: '50% upfront, 50% on posting' },
   { name: 'contentCategory', label: 'Content category' }, { name: 'contractStatus', label: 'Contract status' },
   { name: 'usageRights', label: 'Usage rights' }, { name: 'exclusivity', label: 'Exclusivity terms' },
   { name: 'description', label: 'Campaign description', type: 'area' }, { name: 'notes', label: 'Notes', type: 'area' }

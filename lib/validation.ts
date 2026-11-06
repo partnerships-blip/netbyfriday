@@ -1,7 +1,11 @@
 import { z } from 'zod';
 import { parseMoneyToCents, STAGES } from './finance/core.js';
+import { DEAL_TYPES, SCHEDULES, TRIGGERS } from './deals';
 
 const STAGE_KEYS = STAGES.map(s => s[0]) as [string, ...string[]];
+const DEAL_TYPE_KEYS = DEAL_TYPES.map(t => t[0]) as unknown as [typeof DEAL_TYPES[number][0], ...typeof DEAL_TYPES[number][0][]];
+const SCHEDULE_KEYS = SCHEDULES.map(t => t[0]) as unknown as [typeof SCHEDULES[number][0], ...typeof SCHEDULES[number][0][]];
+const TRIGGER_KEYS = TRIGGERS.map(t => t[0]) as unknown as [typeof TRIGGERS[number][0], ...typeof TRIGGERS[number][0][]];
 export const STREAM_KEYS = ['brand', 'affiliate', 'events', 'digital', 'appearances', 'other'] as const;
 export const DELIVERABLE_KEYS = ['not_started', 'in_progress', 'in_review', 'approved', 'posted', 'scheduled'] as const;
 export const OPP_STATUS = ['new', 'saved', 'pitched', 'dismissed'] as const;
@@ -31,7 +35,9 @@ export const DealSchema = z.object({
   description: text(5000).default(''), fee: optionalMoney('Fee'), feeIsEstimate: z.coerce.boolean().default(false), stage: z.enum(STAGE_KEYS).default('lead'),
   platforms: z.array(text(40)).max(10).default([]), contentCategory: text(80).default(''), contractStatus: text(200).default(''), usageRights: text(500).default(''),
   exclusivity: text(500).default(''), paymentTerms: text(200).default(''), notes: text(10000).default(''),
-  startedOn: isoDate.optional(), lastContactOn: isoDate.optional(), contactId: z.union([uuid, z.literal('')]).optional()
+  startedOn: isoDate.optional(), lastContactOn: isoDate.optional(), contactId: z.union([uuid, z.literal('')]).optional(),
+  dealType: z.enum(DEAL_TYPE_KEYS).default('sponsored'), giftedValue: optionalMoney('Gifted value'), commissionTerms: text(200).default(''),
+  paymentSchedule: z.enum(SCHEDULE_KEYS).default('single'), paymentTrigger: z.enum(TRIGGER_KEYS).default(''), scheduleNote: text(500).default('')
 });
 export const DealPatchSchema = DealSchema.partial().extend({ id: uuid, contactId: z.union([uuid, z.literal('')]).optional() });
 // Moving to Paid records the money. `amount` is only needed when the records can't tell (estimated or $0 fee).
@@ -44,8 +50,13 @@ export const MoveDealSchema = z.object({ id: uuid, stage: z.enum(STAGE_KEYS), re
   }) });
 export const SettleDealSchema = MoveDealSchema.omit({ stage: true });
 
-export const DeliverableSchema = z.object({ dealId: uuid, name: req('Deliverable', 200), dueOn: isoDate, status: z.enum(DELIVERABLE_KEYS).default('not_started'), notes: text(2000).default('') });
-export const DeliverablePatchSchema = z.object({ id: uuid, name: req('Deliverable', 200).optional(), dueOn: isoDate.optional(), status: z.enum(DELIVERABLE_KEYS).optional(), notes: text(2000).optional() });
+// Absent stays absent (a patch leaves it alone); '' clears it; a date sets it.
+const patchDate = z.union([z.literal(''), z.null(), isoDate]).optional().transform(v => v === undefined ? undefined : v || null);
+const delDetails = { platform: text(40).optional(), submitBy: patchDate, submittedOn: patchDate, publishedOn: patchDate,
+  revisions: z.coerce.number().int().min(0, 'Revisions can’t be negative.').max(50).optional(),
+  contentUrl: z.union([z.literal(''), z.string().trim().max(500).url('Use a full link starting with https://').refine(u => /^https?:\/\//i.test(u), 'Use a full link starting with https://')]).optional() };
+export const DeliverableSchema = z.object({ dealId: uuid, name: req('Deliverable', 200), dueOn: isoDate, status: z.enum(DELIVERABLE_KEYS).default('not_started'), notes: text(2000).default(''), ...delDetails });
+export const DeliverablePatchSchema = z.object({ id: uuid, name: req('Deliverable', 200).optional(), dueOn: isoDate.optional(), status: z.enum(DELIVERABLE_KEYS).optional(), notes: text(2000).optional(), ...delDetails });
 
 export const InvoiceSchema = z.object({
   clientName: req('Client'), description: text(2000).default(''), amount: money('Amount', { positive: true }), stream: z.enum(STREAM_KEYS).default('brand'),

@@ -24,10 +24,18 @@ const ok = <T>(r: { data: T; error: any }): NonNullable<T> => { if (r.error) thr
 
 function dealRow(v: Partial<ReturnType<typeof S.DealSchema.parse>>) {
   const r: Record<string, unknown> = {};
-  const map: Record<string, string> = { agency: 'agency', contactName: 'contact_name', contactEmail: 'contact_email', campaign: 'campaign', description: 'description', feeIsEstimate: 'fee_is_estimate', stage: 'stage', platforms: 'platforms', contentCategory: 'content_category', contractStatus: 'contract_status', usageRights: 'usage_rights', exclusivity: 'exclusivity', paymentTerms: 'payment_terms', notes: 'notes', startedOn: 'started_on', lastContactOn: 'last_contact_on' };
+  const map: Record<string, string> = { agency: 'agency', contactName: 'contact_name', contactEmail: 'contact_email', campaign: 'campaign', description: 'description', feeIsEstimate: 'fee_is_estimate', stage: 'stage', platforms: 'platforms', contentCategory: 'content_category', contractStatus: 'contract_status', usageRights: 'usage_rights', exclusivity: 'exclusivity', paymentTerms: 'payment_terms', notes: 'notes', startedOn: 'started_on', lastContactOn: 'last_contact_on', dealType: 'deal_type', commissionTerms: 'commission_terms', paymentSchedule: 'payment_schedule', paymentTrigger: 'payment_trigger', scheduleNote: 'schedule_note' };
   for (const [k, col] of Object.entries(map)) if ((v as any)[k] !== undefined) r[col] = (v as any)[k];
   if (v.fee !== undefined) r.fee_cents = v.fee;
+  if ((v as any).giftedValue !== undefined) r.gifted_value_cents = (v as any).giftedValue;
   if ((v as any).contactId !== undefined) r.contact_id = (v as any).contactId || null;
+  return r;
+}
+
+function delRow(v: { platform?: string; submitBy?: string | null; submittedOn?: string | null; publishedOn?: string | null; revisions?: number; contentUrl?: string }) {
+  const r: Record<string, unknown> = {};
+  if (v.platform !== undefined) r.platform = v.platform; if (v.submitBy !== undefined) r.submit_by = v.submitBy; if (v.submittedOn !== undefined) r.submitted_on = v.submittedOn;
+  if (v.publishedOn !== undefined) r.published_on = v.publishedOn; if (v.revisions !== undefined) r.revisions = v.revisions; if (v.contentUrl !== undefined) r.content_url = v.contentUrl;
   return r;
 }
 
@@ -64,13 +72,13 @@ async function settleIfKnown(c: Ctx, dealId: string, today: string) {
  * Returns the cents recorded.
  */
 async function settleDeal(c: Ctx, dealId: string, receivedOn: string, amount?: number) {
-  const deal = ok(await c.sb.from('deals').select('id,brand_id,campaign,fee_cents,fee_is_estimate').eq('id', dealId).eq('workspace_id', c.ws.id).single());
+  const deal = ok(await c.sb.from('deals').select('id,brand_id,campaign,fee_cents,fee_is_estimate,deal_type').eq('id', dealId).eq('workspace_id', c.ws.id).single());
   const { data: invs } = await c.sb.from('invoices').select('id,amount_cents,voided_at,stream').eq('workspace_id', c.ws.id).eq('deal_id', dealId);
   const live = (invs ?? []).filter(v => !v.voided_at);
   const { data: pays } = live.length ? await c.sb.from('payments').select('invoice_id,amount_cents').eq('workspace_id', c.ws.id).in('invoice_id', live.map(v => v.id)) : { data: [] as any[] };
   const paid = new Map<string, number>();
   for (const p of pays ?? []) paid.set(p.invoice_id, (paid.get(p.invoice_id) ?? 0) + Number(p.amount_cents));
-  const out = dealOutstanding({ feeCents: Number(deal.fee_cents), feeIsEstimate: deal.fee_is_estimate }, live.map(v => ({ amountCents: Number(v.amount_cents), paidCents: paid.get(v.id) ?? 0 })));
+  const out = dealOutstanding({ feeCents: Number(deal.fee_cents), feeIsEstimate: deal.fee_is_estimate, dealType: deal.deal_type }, live.map(v => ({ amountCents: Number(v.amount_cents), paidCents: paid.get(v.id) ?? 0 })));
   if (!out.known && amount === undefined) throw new UserError('NEEDS_AMOUNT');
   const note = 'Recorded when the partnership was marked Paid';
   let recorded = 0;
@@ -141,13 +149,14 @@ export async function deleteDeal(id: string) {
   }, 'Partnership deleted');
 }
 export async function addDeliverable(raw: unknown) {
-  return run(async c => { const v = S.DeliverableSchema.parse(raw); ok(await c.sb.from('deliverables').insert({ workspace_id: c.ws.id, deal_id: v.dealId, name: v.name, due_on: v.dueOn, status: v.status, notes: v.notes })); await track(c, 'deliverable_created'); }, 'Deliverable added');
+  return run(async c => { const v = S.DeliverableSchema.parse(raw); ok(await c.sb.from('deliverables').insert({ workspace_id: c.ws.id, deal_id: v.dealId, name: v.name, due_on: v.dueOn, status: v.status, notes: v.notes, ...delRow(v) })); await track(c, 'deliverable_created'); }, 'Deliverable added');
 }
 export async function updateDeliverable(raw: unknown) {
   return run(async c => {
     const v = S.DeliverablePatchSchema.parse(raw);
     const p: Record<string, unknown> = {};
     if (v.name !== undefined) p.name = v.name; if (v.dueOn !== undefined) p.due_on = v.dueOn; if (v.status !== undefined) p.status = v.status; if (v.notes !== undefined) p.notes = v.notes;
+    Object.assign(p, delRow(v));
     ok(await c.sb.from('deliverables').update(p).eq('id', v.id).eq('workspace_id', c.ws.id).select('id').single());
   });
 }

@@ -61,7 +61,9 @@ export const loadApp = cache(async () => {
       campaign: d.campaign, description: d.description, feeCents: Number(d.fee_cents), feeIsEstimate: d.fee_is_estimate, stage: d.stage, platforms: d.platforms,
       contentCategory: d.content_category, contractStatus: d.contract_status, usageRights: d.usage_rights, exclusivity: d.exclusivity, paymentTerms: d.payment_terms,
       notes: d.notes, startedOn: d.started_on, completedOn: d.completed_on, lastContactOn: d.last_contact_on, contactId: d.contact_id ?? null,
-      deliverables: delRows.filter(x => x.deal_id === d.id).map(x => ({ id: x.id, dealId: x.deal_id, name: x.name, dueOn: x.due_on, status: x.status, notes: x.notes })),
+      dealType: d.deal_type ?? 'sponsored', giftedValueCents: Number(d.gifted_value_cents ?? 0), commissionTerms: d.commission_terms ?? '', paymentSchedule: d.payment_schedule ?? 'single', paymentTrigger: d.payment_trigger ?? '', scheduleNote: d.schedule_note ?? '',
+      deliverables: delRows.filter(x => x.deal_id === d.id).map(x => ({ id: x.id, dealId: x.deal_id, name: x.name, dueOn: x.due_on, status: x.status, notes: x.notes,
+        platform: x.platform ?? '', submitBy: x.submit_by ?? null, submittedOn: x.submitted_on ?? null, publishedOn: x.published_on ?? null, revisions: x.revisions ?? 0, contentUrl: x.content_url ?? '' })),
       attachments: attRows.filter(a => a.deal_id === d.id).map(a => ({ id: a.id, fileName: a.file_name }))
     })),
     invoices: must<any[]>(invoices).map(v => ({ id: v.id, number: v.number, dealId: v.deal_id, clientName: v.client_name, description: v.description, stream: v.stream, amountCents: Number(v.amount_cents), issuedOn: v.issued_on, dueOn: v.due_on, terms: v.terms, voidedAt: v.voided_at, shareToken: v.share_token ?? null, sentAt: v.sent_at ?? null, billToEmail: v.bill_to_email ?? '' })),

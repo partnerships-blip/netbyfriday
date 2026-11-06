@@ -107,3 +107,12 @@ describe('marking a partnership Paid', () => {
     expect(dealOutstanding({ feeCents: 200000, feeIsEstimate: false }, [{ amountCents: 200000, paidCents: 0, voided: true }]).uninvoicedCents).toBe(200000);
   });
 });
+
+describe('gifted collaborations', () => {
+  it('a gifted deal with no fee and no invoices has nothing to record when marked Paid', () => {
+    expect(dealOutstanding({ feeCents: 0, feeIsEstimate: false, dealType: 'gifted' }, [])).toEqual({ openInvoiceCents: 0, uninvoicedCents: 0, totalCents: 0, known: true });
+  });
+  it('a gifted deal that also has a cash fee still records the fee', () => {
+    expect(dealOutstanding({ feeCents: 150000, feeIsEstimate: false, dealType: 'gifted' }, [])).toMatchObject({ totalCents: 150000, known: true });
+  });
+});

@@ -6,12 +6,13 @@ import { Drawer } from '@/components/Modal';
 import { Btn, Eyebrow, Input, Select, Textarea, Pill, cx } from '@/components/ui';
 import { FormModal } from '@/components/FormModal';
 import { DraftModal, type DraftTarget } from '@/components/DraftModal';
-import { dealFields } from '@/components/forms';
+import { dealFields, deliverableFields } from '@/components/forms';
+import { DEAL_TYPE_LABEL, SCHEDULE_LABEL, TRIGGER_LABEL } from '@/lib/deals';
 import { useAction, toast } from '@/components/Toaster';
 import { addDeliverable, updateDeliverable, deleteDeliverable, updateDeal, deleteDeal } from '@/app/(app)/actions';
 import { STAGES, formatCents, shortDate, dealOutstanding } from '@/lib/finance/core.js';
 import { DELIVERABLE_LABEL } from '@/lib/brand';
-import type { Contact, Deal, Stage, Task } from '@/lib/types';
+import type { Contact, Deal, Deliverable, Stage, Task } from '@/lib/types';
 import Link from 'next/link';
 import { TaskList } from '@/components/TaskList';
 import type { InvoiceLite } from './Board';
@@ -25,6 +26,7 @@ export function DealDrawer({ deal, allDeals, contacts = [], tasks = [], invoices
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<DraftTarget | null>(null);
   const [dl, setDl] = useState({ name: '', dueOn: '' });
+  const [editDel, setEditDel] = useState<Deliverable | null>(null);
   const [notes, setNotes] = useState(deal?.notes ?? '');
   useEffect(() => setNotes(deal?.notes ?? ''), [deal?.id, deal?.notes]);
   if (!deal) return null;
@@ -34,7 +36,7 @@ export function DealDrawer({ deal, allDeals, contacts = [], tasks = [], invoices
   const brandInvoices = invoices.filter(v => history.some(d => d.id === v.dealId) || v.clientName.toLowerCase() === deal.brandName.toLowerCase());
   // Same basis as Brands & Contacts: payments recorded on this brand's invoices, linked or billed to it by name.
   const histReceived = brandInvoices.reduce((a, v) => a + v.paidCents, 0);
-  const facts: [string, string][] = [['Agency', deal.agency], ['Contact', deal.contactName], ['Email', deal.contactEmail], ['Platforms', deal.platforms.join(', ')], ['Contract', deal.contractStatus], ['Usage rights', deal.usageRights], ['Exclusivity', deal.exclusivity], ['Payment terms', deal.paymentTerms], ['Content category', deal.contentCategory], ['Started', shortDate(deal.startedOn)], ['Last contact', shortDate(deal.lastContactOn)], ['Received on this deal', formatCents(received[deal.id] || 0)]];
+  const facts: [string, string][] = [['Type', DEAL_TYPE_LABEL[deal.dealType ?? 'sponsored']], ...(deal.giftedValueCents ? [['Gifted product value', `${formatCents(deal.giftedValueCents)} · non-cash, not revenue`] as [string, string]] : []), ...(deal.commissionTerms ? [['Commission', `${deal.commissionTerms} · counted when paid out`] as [string, string]] : []), ['Payment schedule', [SCHEDULE_LABEL[deal.paymentSchedule ?? 'single'], deal.scheduleNote].filter(Boolean).join(' · ')], ['Payment clock starts', deal.paymentTrigger ? TRIGGER_LABEL[deal.paymentTrigger] : 'Not set'], ['Agency', deal.agency], ['Contact', deal.contactName], ['Email', deal.contactEmail], ['Platforms', deal.platforms.join(', ')], ['Contract', deal.contractStatus], ['Usage rights', deal.usageRights], ['Exclusivity', deal.exclusivity], ['Payment terms', deal.paymentTerms], ['Content category', deal.contentCategory], ['Started', shortDate(deal.startedOn)], ['Last contact', shortDate(deal.lastContactOn)], ['Received on this deal', formatCents(received[deal.id] || 0)]];
   const cycle = (s: string) => { const order = ['not_started', 'in_progress', 'in_review', 'approved', 'posted']; return order[(order.indexOf(s) + 1) % order.length]; };
   const refresh = () => router.refresh();
 
@@ -69,8 +71,11 @@ export function DealDrawer({ deal, allDeals, contacts = [], tasks = [], invoices
           <Eyebrow>Deliverables</Eyebrow>
           {deal.deliverables.map(x => (
             <div key={x.id} className="flex items-center gap-3 border-b border-soft2 py-2.5">
-              <div className="min-w-0 flex-1"><div className="text-sm font-medium">{x.name}</div><div className="text-xs text-muted">Due {shortDate(x.dueOn)}{x.notes ? ` · ${x.notes}` : ''}</div></div>
+              <div className="min-w-0 flex-1"><div className="text-sm font-medium">{x.name}{x.platform ? <span className="font-normal text-muted"> · {x.platform}</span> : null}</div>
+                <div className="text-xs text-muted">{[x.submitBy && !x.submittedOn ? `Draft due ${shortDate(x.submitBy)}` : '', x.submittedOn ? `Submitted ${shortDate(x.submittedOn)}` : '', x.revisions ? `${x.revisions} revision${x.revisions === 1 ? '' : 's'}` : '', x.publishedOn ? `Published ${shortDate(x.publishedOn)}` : `Post by ${shortDate(x.dueOn)}`, x.notes].filter(Boolean).join(' · ')}</div>
+                {x.contentUrl && <a href={x.contentUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-medium text-ink underline underline-offset-2">View post</a>}</div>
               <button disabled={readOnly || pending} title="Advance status" onClick={() => run(() => updateDeliverable({ id: x.id, status: cycle(x.status) }), refresh)}><Pill tone={DTONE[x.status]}>{DELIVERABLE_LABEL[x.status]}</Pill></button>
+              {!readOnly && <button aria-label={`Edit ${x.name}`} className="text-xs text-muted hover:text-ink" onClick={() => setEditDel(x)}>Edit</button>}
               {!readOnly && <button aria-label={`Remove ${x.name}`} className="text-xs text-muted hover:text-danger" onClick={() => confirm(`Remove “${x.name}”?`) && run(() => deleteDeliverable(x.id), refresh)}>Remove</button>}
             </div>
           ))}
@@ -131,8 +136,11 @@ export function DealDrawer({ deal, allDeals, contacts = [], tasks = [], invoices
         {!readOnly && <div className="border-t border-soft pt-4"><Btn variant="danger" onClick={() => confirm('Delete this partnership and its deliverables?') && run(() => deleteDeal(deal.id), () => { onClose(); refresh(); })}>Delete partnership</Btn></div>}
       </div>
       <FormModal open={editing} onClose={() => setEditing(false)} title="Edit partnership" fields={dealFields} submitLabel="Save changes"
-        initial={{ brand: deal.brandName, campaign: deal.campaign, agency: deal.agency, contactName: deal.contactName, contactEmail: deal.contactEmail, fee: String(deal.feeCents / 100), feeIsEstimate: deal.feeIsEstimate, stage: deal.stage, paymentTerms: deal.paymentTerms, contentCategory: deal.contentCategory, contractStatus: deal.contractStatus, usageRights: deal.usageRights, exclusivity: deal.exclusivity, description: deal.description, notes: deal.notes }}
+        initial={{ brand: deal.brandName, campaign: deal.campaign, dealType: deal.dealType ?? 'sponsored', giftedValue: deal.giftedValueCents ? String(deal.giftedValueCents / 100) : '', commissionTerms: deal.commissionTerms ?? '', paymentSchedule: deal.paymentSchedule ?? 'single', paymentTrigger: deal.paymentTrigger ?? '', scheduleNote: deal.scheduleNote ?? '', agency: deal.agency, contactName: deal.contactName, contactEmail: deal.contactEmail, fee: String(deal.feeCents / 100), feeIsEstimate: deal.feeIsEstimate, stage: deal.stage, paymentTerms: deal.paymentTerms, contentCategory: deal.contentCategory, contractStatus: deal.contractStatus, usageRights: deal.usageRights, exclusivity: deal.exclusivity, description: deal.description, notes: deal.notes }}
         action={async v => { const r = await updateDeal({ ...v, id: deal.id }); if (r.ok) refresh(); return r; }} />
+      {editDel && <FormModal open onClose={() => setEditDel(null)} title="Edit deliverable" fields={deliverableFields} submitLabel="Save deliverable"
+        initial={{ name: editDel.name, platform: editDel.platform ?? '', status: editDel.status, revisions: String(editDel.revisions ?? 0), submitBy: editDel.submitBy ?? '', submittedOn: editDel.submittedOn ?? '', dueOn: editDel.dueOn, publishedOn: editDel.publishedOn ?? '', contentUrl: editDel.contentUrl ?? '', notes: editDel.notes }}
+        action={async v => { const r = await updateDeliverable({ ...v, id: editDel.id }); if (r.ok) refresh(); return r; }} />}
       <DraftModal target={draft} onClose={() => setDraft(null)} />
     </Drawer>
   );

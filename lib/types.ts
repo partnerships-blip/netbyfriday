@@ -7,7 +7,8 @@ export type OpportunityStatus = 'new' | 'saved' | 'pitched' | 'dismissed';
 export type TaskStatus = 'open' | 'done';
 export type TaskPriority = 'low' | 'normal' | 'high';
 
-export interface Deliverable { id: string; dealId: string; name: string; dueOn: string; status: DeliverableStatus; notes: string }
+export interface Deliverable { id: string; dealId: string; name: string; dueOn: string; status: DeliverableStatus; notes: string;
+  platform?: string; submitBy?: string | null; submittedOn?: string | null; publishedOn?: string | null; revisions?: number; contentUrl?: string }
 
 export interface Deal {
   id: string; brandId: string; brandName: string; agency: string; contactName: string; contactEmail: string;
@@ -15,6 +16,9 @@ export interface Deal {
   contentCategory: string; contractStatus: string; usageRights: string; exclusivity: string; paymentTerms: string; notes: string;
   startedOn: string; completedOn: string | null; lastContactOn: string; deliverables: Deliverable[]; contactId?: string | null;
   attachments?: { id: string; fileName: string }[];
+  /** Creator deal details. Gifted value is non-cash and never revenue. */
+  dealType?: import('./deals').DealType; giftedValueCents?: number; commissionTerms?: string;
+  paymentSchedule?: import('./deals').PaymentSchedule; paymentTrigger?: import('./deals').PaymentTrigger; scheduleNote?: string;
 }
 
 export interface Invoice {
