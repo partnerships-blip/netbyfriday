@@ -19,7 +19,7 @@ export function FeedbackButton({ openRequest = 0 }: { openRequest?: number }) {
     <>
       {/* Floating button. On phones the Advisor's ask box is pinned to the bottom of the screen, so the button
           would sit on its text; there it is hidden and feedback is reached from the More menu instead. */}
-      <button onClick={() => setOpen(true)} className={`fixed bottom-20 right-4 z-30 h-9 rounded-full border border-line2 bg-white px-4 text-[13px] font-medium shadow-sm hover:border-ink md:bottom-5 ${page.startsWith('/advisor') || /^\/content-intelligence\/[^/]+\/analysis\//.test(page) ? 'hidden md:block' : ''}`}>Feedback</button>
+      <button onClick={() => setOpen(true)} className={`fixed bottom-20 right-4 z-30 h-9 rounded-full border border-line2 bg-white px-4 text-[13px] font-medium shadow-sm hover:border-ink md:bottom-5 ${page.startsWith('/advisor') ? 'hidden md:block' : ''}`}>Feedback</button>
       <Modal open={open} onClose={() => setOpen(false)}>
         <div className="flex flex-col gap-3.5">
           <h2 className="font-head text-[28px]">Send feedback</h2>

@@ -21,7 +21,7 @@ const NAV: (readonly [string, string])[] = [
   ['/settings', 'Settings']
 ];
 const MOBILE = [['/overview', 'Home'], ['/partnerships', 'Deals'], ['/money', 'Money'], ['/tasks', 'Tasks']] as const;
-const MORE = ['/content', '/content-intelligence', '/contracts', '/taxes', '/contacts', '/advisor', '/intelligence', '/opportunities', '/audience', '/settings'];
+const MORE = ['/content', '/contracts', '/taxes', '/contacts', '/advisor', '/intelligence', '/opportunities', '/audience', '/settings'];
 
 type Notif = { key: string; type: string; text: string; href: string; unread: boolean };
 
@@ -36,8 +36,7 @@ export function Shell({ children, brandName, logoUrl, initials, name, business, 
   const [feedbackRequest, setFeedbackRequest] = useState(0);
   const [, run] = useAction();
   const unread = notifications.filter(n => n.unread);
-  // Content Intelligence: everyone once the flag is on; until then, beta admins only (founder testing).
-  const nav = flag('contentIntel') || isAdmin ? [...NAV.slice(0, NAV.findIndex(([h]) => h === '/contacts')), ['/content-intelligence', 'Content Intelligence'] as const, ...NAV.slice(NAV.findIndex(([h]) => h === '/contacts'))] : NAV;
+  const nav = NAV;
   const current = nav.find(([h]) => (path === h || path.startsWith(h + '/')));
   const switchMode = () => run(() => setDemoMode(!demo), () => router.refresh());
   const whiteLabel = flag('whiteLabel');

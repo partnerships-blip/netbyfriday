@@ -9,10 +9,7 @@ export interface AIProvider {
   completeWithMeta(opts: { system: string; messages: ChatMessage[]; maxTokens: number }): Promise<Completion>;
   /** One user turn that carries a document (a PDF, or plain text) plus an instruction. PDFs need a provider that reads them. */
   readDocument(opts: { system: string; instruction: string; pdfBase64?: string; text?: string; maxTokens: number }): Promise<Completion>;
-  /** One user turn with images (JPEG/PNG/WEBP, base64) plus an instruction. Returns token counts for cost tracking. */
-  readImages(opts: { system: string; instruction: string; images: { mime: string; base64: string }[]; maxTokens: number }): Promise<Completion & Usage>;
 }
-export interface Usage { inputTokens: number | null; outputTokens: number | null }
 export class AIUnavailable extends Error {}
 
 function anthropic(): AIProvider {
@@ -46,19 +43,6 @@ function anthropic(): AIProvider {
       if (!res.ok) { console.error('[ai] anthropic document', res.status, await res.text().catch(() => '')); throw new AIUnavailable('The AI service returned an error.'); }
       const j = await res.json();
       return { text: (j.content ?? []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('').trim(), stopReason: j.stop_reason ?? null };
-    },
-    async readImages({ system, instruction, images, maxTokens }) {
-      const content = [...images.map(i => ({ type: 'image', source: { type: 'base64', media_type: i.mime, data: i.base64 } })), { type: 'text', text: instruction }];
-      const res = await fetch((process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com').replace(/\/$/, '') + '/v1/messages', {
-        method: 'POST',
-        headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-        body: JSON.stringify({ model, max_tokens: maxTokens, system, messages: [{ role: 'user', content }] }),
-        signal: AbortSignal.timeout(90_000)
-      });
-      if (!res.ok) { console.error('[ai] anthropic images', res.status, await res.text().catch(() => '')); throw new AIUnavailable('The AI service returned an error.'); }
-      const j = await res.json();
-      return { text: (j.content ?? []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('').trim(), stopReason: j.stop_reason ?? null,
-        inputTokens: j.usage?.input_tokens ?? null, outputTokens: j.usage?.output_tokens ?? null };
     }
   };
 }
@@ -83,16 +67,6 @@ function openaiCompatible(): AIProvider {
     async readDocument({ system, instruction, pdfBase64, text, maxTokens }) {
       if (pdfBase64) throw new AIUnavailable('Reading PDFs needs the Anthropic provider. Paste the contract text instead.');
       return this.completeWithMeta({ system, messages: [{ role: 'user', content: `<document>\n${text ?? ''}\n</document>\n\n${instruction}` }], maxTokens });
-    },
-    async readImages({ system, instruction, images, maxTokens }) {
-      const res = await fetch(base.replace(/\/$/, '') + '/chat/completions', {
-        method: 'POST', headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-        body: JSON.stringify({ model, max_tokens: maxTokens, messages: [{ role: 'system', content: system }, { role: 'user', content: [...images.map(i => ({ type: 'image_url', image_url: { url: `data:${i.mime};base64,${i.base64}` } })), { type: 'text', text: instruction }] }] }),
-        signal: AbortSignal.timeout(90_000)
-      });
-      if (!res.ok) { console.error('[ai] openai-compatible images', res.status); throw new AIUnavailable('The AI service couldn’t read images. Use a provider with vision, or enter the numbers by hand.'); }
-      const j = await res.json(); const finish = j.choices?.[0]?.finish_reason ?? null;
-      return { text: String(j.choices?.[0]?.message?.content ?? '').trim(), stopReason: finish === 'length' ? 'max_tokens' : finish, inputTokens: j.usage?.prompt_tokens ?? null, outputTokens: j.usage?.completion_tokens ?? null };
     }
   };
 }

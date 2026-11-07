@@ -36,5 +36,4 @@ Milestones 1–4 are complete; staging is https://netbyfriday-x566.vercel.app (d
 - After any Advisor prompt or model change, run the "Advisor evaluation" GitHub workflow against staging. It must keep 0 wrong-verified and at least 18/20.
 - Public site figures come only from `lib/marketing/sample.ts` (engine + demo fixture). Never hand-type numbers on the site.
 - Contracts (AI-read terms, creator confirms), Taxes (cash-basis set-aside) and sendable invoices (private link + creator's own email app) are live: `docs/CONTRACTS_TAXES_INVOICES.md`. Contract reading follows the Advisor rules: proposals only, money parsed by the engine, Confirm runs normal server actions.
-- Content Intelligence is built behind the `contentIntel` flag (off in production until the founder approves): `docs/CONTENT_INTELLIGENCE.md`. Reports follow the Advisor rules: every point cites a source, numbers come from what it cites (`verifyReport`, `verifyFollowUp`), comparisons are calculated in `lib/content/compare.ts`, nothing is sent or published, saves happen only on click.
 - Next is M5 (Stripe), only when the founder starts the paid beta; otherwise M6 launch prep (`docs/MVP_PLAN.md` §6).
