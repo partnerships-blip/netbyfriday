@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import { test, expect } from '@playwright/test';
 import { execSync } from 'node:child_process';
 import { demoData } from '../../lib/demo/fixture';
@@ -71,12 +72,19 @@ test.describe.serial('public site and waitlist', () => {
     expect(mailto).toContain(email); expect(mailto).toContain('/signup');
     await page.getByRole('button', { name: 'invited' }).click();
     await expect(page.getByText(code).first()).toBeVisible();
+    const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('link', { name: 'Download CSV' }).click()]);
+    expect(dl.suggestedFilename()).toMatch(/^netbyfriday-waitlist-\d{4}-\d{2}-\d{2}\.csv$/);
+    const csv = fs.readFileSync((await dl.path())!, 'utf8');
+    expect(csv).toContain('Requested on,Email,Name'); expect(csv).toMatch(new RegExp(`${email.replace(/[.]/g, '\\.')},.*,Invited,.*,${code}`));
     await page.getByRole('button', { name: 'Sign out' }).first().click(); await page.waitForURL('**/login');
     for (const [who, ok] of [[email, true], [`second-${stamp}@e2e.test`, false]] as const) {
       await page.goto('/signup');
       await page.getByLabel('Invite code').fill(code); await page.getByLabel('Email').fill(who); await page.getByLabel('Password').fill('correct-horse-battery-wren');
       await page.getByRole('button', { name: 'Create account' }).click();
-      if (ok) { await page.waitForURL('**/onboarding'); await page.context().clearCookies(); }
+      if (ok) { await page.waitForURL('**/onboarding');
+        expect((await page.request.get('/api/admin/waitlist')).status()).toBe(404);   // signed in, but not an admin
+        await page.context().clearCookies();
+        expect((await page.request.get('/api/admin/waitlist')).status()).toBe(404); }   // signed out
       else await expect(page.getByRole('alert').filter({ hasText: 'invite code' })).toBeVisible();   // single use
     }
   });

@@ -26,6 +26,7 @@ export function WaitlistAdmin({ rows, signupUrl }: { rows: Row[]; signupUrl: str
     <Card className="flex flex-col gap-3 p-5">
       <div className="flex flex-wrap items-center gap-3">
         <Eyebrow className="mr-auto">Waitlist · {rows.filter(r => !r.invited_at).length} waiting · {rows.filter(r => r.invited_at).length} invited</Eyebrow>
+        <a href="/api/admin/waitlist" download className="inline-flex h-8 items-center rounded-[8px] border border-line2 bg-white px-3 text-[13px] font-semibold">Download CSV</a>
         <div className="flex gap-1 rounded-[10px] bg-lavender p-[3px]">{(['waiting', 'invited'] as const).map(t => <button key={t} aria-pressed={show === t} onClick={() => setShow(t)} className={`h-8 rounded-[8px] px-3 text-[13px] font-semibold capitalize ${show === t ? 'bg-white' : 'text-sub'}`}>{t}</button>)}</div>
       </div>
       <p className="text-xs text-muted">Invite creates a single-use code (30 days) and opens a ready-to-send email in your own email app. Nothing is sent by netbyfriday.</p>
