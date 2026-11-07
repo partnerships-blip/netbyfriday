@@ -14,6 +14,7 @@ const NAV: (readonly [string, string])[] = [
   ['/overview', 'Dashboard'], ['/partnerships', 'Partnerships'], ['/content', 'Content'], ['/money', 'Invoices & Revenue'],
   ...(flag('contracts') ? [['/contracts', 'Contracts'] as const] : []),
   ...(flag('taxes') ? [['/taxes', 'Taxes'] as const] : []),
+  ...(flag('contentIntel') ? [['/content-intelligence', 'Content Intelligence'] as const] : []),
   ['/contacts', 'Brands & Contacts'], ['/tasks', 'Tasks'], ['/advisor', 'AI Advisor'],
   ...(flag('insights') ? [['/intelligence', 'Insights'] as const] : []),
   ...(flag('opportunities') ? [['/opportunities', 'Opportunities'] as const] : []),
@@ -21,7 +22,7 @@ const NAV: (readonly [string, string])[] = [
   ['/settings', 'Settings']
 ];
 const MOBILE = [['/overview', 'Home'], ['/partnerships', 'Deals'], ['/money', 'Money'], ['/tasks', 'Tasks']] as const;
-const MORE = ['/content', '/contracts', '/taxes', '/contacts', '/advisor', '/intelligence', '/opportunities', '/audience', '/settings'];
+const MORE = ['/content', '/content-intelligence', '/contracts', '/taxes', '/contacts', '/advisor', '/intelligence', '/opportunities', '/audience', '/settings'];
 
 type Notif = { key: string; type: string; text: string; href: string; unread: boolean };
 
@@ -36,7 +37,7 @@ export function Shell({ children, brandName, logoUrl, initials, name, business, 
   const [feedbackRequest, setFeedbackRequest] = useState(0);
   const [, run] = useAction();
   const unread = notifications.filter(n => n.unread);
-  const current = NAV.find(([h]) => path.startsWith(h));
+  const current = NAV.find(([h]) => (path === h || path.startsWith(h + '/')));
   const switchMode = () => run(() => setDemoMode(!demo), () => router.refresh());
   const whiteLabel = flag('whiteLabel');
   const Mark = ({ size = 22 }: { size?: number }) => whiteLabel && logoUrl
@@ -49,7 +50,7 @@ export function Shell({ children, brandName, logoUrl, initials, name, business, 
         <div className="flex items-center gap-2.5 px-2.5 py-1">{whiteLabel ? <><Mark /><div className="truncate text-[15px] font-semibold tracking-tight">{brandName}</div></> : <Wordmark size={23} />}</div>
         <nav className="flex flex-col gap-0.5" aria-label="Main">
           {NAV.map(([href, label], i) => {
-            const on = path.startsWith(href);
+            const on = (path === href || path.startsWith(href + '/'));
             const b = badges[href];
             return (
               <Link key={href} href={href} aria-current={on ? 'page' : undefined} className={cx('flex h-9 items-center gap-3 rounded-lg px-2.5 text-sm transition hover:bg-[#EAE5F7]', on ? 'bg-[#DFFF43] font-bold text-ink' : 'font-medium text-sub')}>
@@ -88,7 +89,7 @@ export function Shell({ children, brandName, logoUrl, initials, name, business, 
         </header>
         <main className="min-h-0 flex-1 overflow-auto"><div className="mx-auto flex max-w-[1240px] flex-col gap-7 px-4 pb-24 pt-6 md:px-10 md:pb-16 md:pt-9">{children}</div></main>
         <nav className="grid h-16 flex-none grid-cols-5 border-t border-line bg-white md:hidden" aria-label="Main">
-          {MOBILE.map(([href, label]) => { const on = path.startsWith(href); return (
+          {MOBILE.map(([href, label]) => { const on = (path === href || path.startsWith(href + '/')); return (
             <Link key={href} href={href} className={cx('flex flex-col items-center justify-center gap-1.5 text-[11px]', on ? 'font-semibold text-ink' : 'text-muted')}><span className={cx('h-[3px] w-[18px] rounded', on ? 'bg-ac' : 'bg-transparent')} />{label}</Link>); })}
           <button onClick={() => setMoreOpen(o => !o)} className={cx('flex flex-col items-center justify-center gap-1.5 text-[11px]', MORE.some(m => path.startsWith(m)) ? 'font-semibold text-ink' : 'text-muted')}><span className={cx('h-[3px] w-[18px] rounded', MORE.some(m => path.startsWith(m)) ? 'bg-ac' : 'bg-transparent')} />More</button>
         </nav>

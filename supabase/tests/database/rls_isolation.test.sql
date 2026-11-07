@@ -2,7 +2,7 @@
 -- Verifies invite gating, workspace isolation, cross-tenant FK protection, and payment guards.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(31);
+select plan(36);
 
 insert into public.invite_codes(code, max_uses) values ('PGTAP-TEST', 5);
 
@@ -68,6 +68,10 @@ select throws_ok(
 insert into public.import_runs (workspace_id, kind, file_name, total_rows, imported)
   values ((select id from t_ws where owner_id = '11111111-1111-1111-1111-111111111111'), 'deals', 'deals.csv', 3, 3);
 
+insert into public.content_items (id, workspace_id, title) values ('c0000000-0000-4000-8000-00000000000a', (select id from t_ws where owner_id = '11111111-1111-1111-1111-111111111111'), 'A reel');
+insert into public.content_snapshots (workspace_id, content_id, measured_on, period, views) values ((select id from t_ws where owner_id = '11111111-1111-1111-1111-111111111111'), 'c0000000-0000-4000-8000-00000000000a', '2026-11-01', '24h', 2599);
+insert into public.content_reports (workspace_id, content_id, mode, input_hash, report) values ((select id from t_ws where owner_id = '11111111-1111-1111-1111-111111111111'), 'c0000000-0000-4000-8000-00000000000a', 'creative', repeat('a', 64), '{}');
+
 -- ---------- as user B ----------
 select set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}', true);
 
@@ -113,6 +117,15 @@ select is((select count(*)::int from public.import_runs), 0, 'B cannot see A imp
 select throws_ok(
   $$ insert into public.import_runs (workspace_id, kind) values ((select id from t_ws where owner_id = '11111111-1111-1111-1111-111111111111'), 'contacts') $$,
   '42501', null, 'B cannot write import history into A workspace');
+select is((select count(*)::int from public.content_items), 0, 'B cannot see A content');
+select is((select count(*)::int from public.content_snapshots), 0, 'B cannot see A performance snapshots');
+select is((select count(*)::int from public.content_reports), 0, 'B cannot see A content reports');
+select throws_ok(
+  $$ insert into public.content_items (workspace_id, title) values ((select id from t_ws where owner_id = '11111111-1111-1111-1111-111111111111'), 'sneaky') $$,
+  '42501', null, 'B cannot add content to A workspace');
+select throws_ok(
+  $$ insert into public.content_snapshots (workspace_id, content_id, measured_on, period) values ((select id from t_ws where owner_id = '22222222-2222-2222-2222-222222222222'), 'c0000000-0000-4000-8000-00000000000a', '2026-11-02', '24h') $$,
+  '23503', null, 'B cannot attach a snapshot in its own workspace to A content');
 select is(public.shared_invoice(null), null, 'no token, no invoice');
 
 -- ---------- anonymous (a brand opening a shared invoice link) ----------
