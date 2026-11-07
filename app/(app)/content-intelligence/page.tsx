@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { flag } from '@/lib/flags';
+import { contentIntelAllowed } from '@/lib/content/access';
 import { loadApp } from '@/lib/data/load';
 import { requireWorkspace } from '@/lib/auth';
 import { loadLibrary } from '@/lib/content/server';
@@ -9,7 +9,7 @@ import { LibraryClient } from './LibraryClient';
 export const metadata = { title: 'Content Intelligence' };
 
 export default async function ContentIntelligencePage() {
-  if (!flag('contentIntel')) notFound();
+  if (!(await contentIntelAllowed())) notFound();
   const app = await loadApp();
   const rows = app.demo ? [] : await loadLibrary(await requireWorkspace());
   return (

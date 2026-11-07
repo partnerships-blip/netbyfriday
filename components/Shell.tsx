@@ -14,7 +14,6 @@ const NAV: (readonly [string, string])[] = [
   ['/overview', 'Dashboard'], ['/partnerships', 'Partnerships'], ['/content', 'Content'], ['/money', 'Invoices & Revenue'],
   ...(flag('contracts') ? [['/contracts', 'Contracts'] as const] : []),
   ...(flag('taxes') ? [['/taxes', 'Taxes'] as const] : []),
-  ...(flag('contentIntel') ? [['/content-intelligence', 'Content Intelligence'] as const] : []),
   ['/contacts', 'Brands & Contacts'], ['/tasks', 'Tasks'], ['/advisor', 'AI Advisor'],
   ...(flag('insights') ? [['/intelligence', 'Insights'] as const] : []),
   ...(flag('opportunities') ? [['/opportunities', 'Opportunities'] as const] : []),
@@ -37,7 +36,9 @@ export function Shell({ children, brandName, logoUrl, initials, name, business, 
   const [feedbackRequest, setFeedbackRequest] = useState(0);
   const [, run] = useAction();
   const unread = notifications.filter(n => n.unread);
-  const current = NAV.find(([h]) => (path === h || path.startsWith(h + '/')));
+  // Content Intelligence: everyone once the flag is on; until then, beta admins only (founder testing).
+  const nav = flag('contentIntel') || isAdmin ? [...NAV.slice(0, NAV.findIndex(([h]) => h === '/contacts')), ['/content-intelligence', 'Content Intelligence'] as const, ...NAV.slice(NAV.findIndex(([h]) => h === '/contacts'))] : NAV;
+  const current = nav.find(([h]) => (path === h || path.startsWith(h + '/')));
   const switchMode = () => run(() => setDemoMode(!demo), () => router.refresh());
   const whiteLabel = flag('whiteLabel');
   const Mark = ({ size = 22 }: { size?: number }) => whiteLabel && logoUrl
@@ -49,7 +50,7 @@ export function Shell({ children, brandName, logoUrl, initials, name, business, 
       <aside className="hidden w-[236px] flex-none flex-col gap-6 border-r border-line px-3 py-5 md:flex">
         <div className="flex items-center gap-2.5 px-2.5 py-1">{whiteLabel ? <><Mark /><div className="truncate text-[15px] font-semibold tracking-tight">{brandName}</div></> : <Wordmark size={23} />}</div>
         <nav className="flex flex-col gap-0.5" aria-label="Main">
-          {NAV.map(([href, label], i) => {
+          {nav.map(([href, label], i) => {
             const on = (path === href || path.startsWith(href + '/'));
             const b = badges[href];
             return (
@@ -98,7 +99,7 @@ export function Shell({ children, brandName, logoUrl, initials, name, business, 
       {moreOpen && <>
         <div className="fixed inset-0 z-30 bg-ink/20 md:hidden" onClick={() => setMoreOpen(false)} />
         <div className="animate-in fixed inset-x-0 bottom-16 z-40 flex flex-col rounded-t-2xl border-t border-line bg-white px-3 pb-3.5 pt-2.5 md:hidden">
-          {[...NAV.filter(([h]) => MORE.includes(h)), ...(isAdmin ? [['/admin', 'Beta admin'] as const] : [])].map(([href, label]) => <Link key={href} href={href} onClick={() => setMoreOpen(false)} className="flex h-12 items-center border-b border-soft2 px-2.5 text-[15px]">{label}</Link>)}
+          {[...nav.filter(([h]) => MORE.includes(h)), ...(isAdmin ? [['/admin', 'Beta admin'] as const] : [])].map(([href, label]) => <Link key={href} href={href} onClick={() => setMoreOpen(false)} className="flex h-12 items-center border-b border-soft2 px-2.5 text-[15px]">{label}</Link>)}
           <button onClick={() => { setMoreOpen(false); setFeedbackRequest(n => n + 1); }} className="flex h-12 items-center border-b border-soft2 px-2.5 text-left text-[15px]">Send feedback</button>
           <form action="/auth/signout" method="post"><button className="h-12 w-full px-2.5 text-left text-[15px] text-sub">Sign out</button></form>
         </div>

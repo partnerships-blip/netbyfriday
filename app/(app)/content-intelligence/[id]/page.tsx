@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { flag } from '@/lib/flags';
+import { contentIntelAllowed } from '@/lib/content/access';
 import { loadApp } from '@/lib/data/load';
 import { requireWorkspace } from '@/lib/auth';
 import { loadItem, loadReports, limits } from '@/lib/content/server';
@@ -12,7 +12,7 @@ import { ContentDetail } from './ContentDetail';
 export const metadata = { title: 'Content' };
 
 export default async function ContentItemPage({ params }: { params: { id: string } }) {
-  if (!flag('contentIntel') || !/^[0-9a-f-]{36}$/.test(params.id)) notFound();
+  if (!(await contentIntelAllowed()) || !/^[0-9a-f-]{36}$/.test(params.id)) notFound();
   const app = await loadApp();
   const c = await requireWorkspace();
   const data = await loadItem(c, params.id);

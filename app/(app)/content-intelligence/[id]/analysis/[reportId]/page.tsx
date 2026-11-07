@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { flag } from '@/lib/flags';
+import { contentIntelAllowed } from '@/lib/content/access';
 import { loadApp } from '@/lib/data/load';
 import { requireWorkspace } from '@/lib/auth';
 import { loadReport } from '@/lib/content/server';
@@ -10,7 +10,7 @@ import { ReportView } from './ReportView';
 export const metadata = { title: 'Content analysis' };
 
 export default async function AnalysisPage({ params }: { params: { id: string; reportId: string } }) {
-  if (!flag('contentIntel') || !/^[0-9a-f-]{36}$/.test(params.id) || !/^[0-9a-f-]{36}$/.test(params.reportId)) notFound();
+  if (!(await contentIntelAllowed()) || !/^[0-9a-f-]{36}$/.test(params.id) || !/^[0-9a-f-]{36}$/.test(params.reportId)) notFound();
   const app = await loadApp();
   const data = await loadReport(await requireWorkspace(), params.id, params.reportId);
   if (!data) notFound();

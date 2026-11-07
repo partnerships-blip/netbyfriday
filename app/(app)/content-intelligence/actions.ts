@@ -5,7 +5,7 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
-import { flag } from '@/lib/flags';
+import { contentIntelAllowed } from '@/lib/content/access';
 import { requireWritable, friendlyError, UserError } from '@/lib/auth';
 import { ContentSchema, SnapshotSchema, checkUpload, extFor, sniffMatches, type AssetKind } from '@/lib/content/model';
 import { limits, workspaceBytes } from '@/lib/content/server';
@@ -33,7 +33,7 @@ async function firstBytes(url: string, n: number): Promise<Uint8Array | null> {
     return value ? value.slice(0, n) : null;
   } catch { return null; }
 }
-const on = () => { if (!flag('contentIntel')) throw new UserError('Content Intelligence isn’t turned on yet.'); };
+const on = async () => { if (!(await contentIntelAllowed())) throw new UserError('Content Intelligence isn’t turned on yet.'); };
 const ok = <T = any,>(r: { error: any; data?: any }): T => { if (r.error) throw r.error; return r.data as T; };
 const row = (v: z.infer<typeof ContentSchema>) => ({ title: v.title, platform: v.platform, format: v.format, url: v.url, published_on: v.publishedOn, category: v.category,
   goal: v.goal, caption: v.caption, description: v.description, transcript: v.transcript, duration_seconds: v.durationSeconds == null ? null : Math.round(v.durationSeconds) });
@@ -45,7 +45,7 @@ async function owned(c: Awaited<ReturnType<typeof requireWritable>>, contentId: 
 
 export async function createContent(raw: unknown): Promise<ActionResult & { id?: string }> {
   try {
-    on(); const v = ContentSchema.parse(raw); const c = await requireWritable();
+    await on(); const v = ContentSchema.parse(raw); const c = await requireWritable();
     const d = ok<{ id: string }>(await c.sb.from('content_items').insert({ workspace_id: c.ws.id, ...row(v) }).select('id').single());
     revalidatePath('/content-intelligence');
     return { ok: true, id: d.id, message: 'Added to your library' };
@@ -54,7 +54,7 @@ export async function createContent(raw: unknown): Promise<ActionResult & { id?:
 
 export async function updateContent(raw: unknown): Promise<ActionResult> {
   try {
-    on(); const id = uuid.parse((raw as any)?.id); const v = ContentSchema.parse(raw); const c = await requireWritable();
+    await on(); const id = uuid.parse((raw as any)?.id); const v = ContentSchema.parse(raw); const c = await requireWritable();
     await owned(c, id);
     ok(await c.sb.from('content_items').update(row(v)).eq('id', id).eq('workspace_id', c.ws.id));
     revalidatePath(`/content-intelligence/${id}`); revalidatePath('/content-intelligence');
@@ -65,7 +65,7 @@ export async function updateContent(raw: unknown): Promise<ActionResult> {
 /** Deletes the item, every file stored for it, and (by cascade) its snapshots, reports, conversations and links. */
 export async function deleteContent(id: string): Promise<ActionResult> {
   try {
-    on(); const c = await requireWritable(); await owned(c, id);
+    await on(); const c = await requireWritable(); await owned(c, id);
     const assets = ok<{ path: string }[]>(await c.sb.from('content_assets').select('path').eq('content_id', id));
     if (assets?.length) { const { error } = await c.sb.storage.from('content').remove(assets.map(a => a.path)); if (error) throw error; }
     ok(await c.sb.from('content_items').delete().eq('id', id).eq('workspace_id', c.ws.id));
@@ -77,7 +77,7 @@ export async function deleteContent(id: string): Promise<ActionResult> {
 /** A new measurement. Earlier measurements are kept; nothing is overwritten. */
 export async function addSnapshot(raw: unknown): Promise<ActionResult & { id?: string }> {
   try {
-    on(); const v = SnapshotSchema.parse(raw); const c = await requireWritable(); await owned(c, v.contentId);
+    await on(); const v = SnapshotSchema.parse(raw); const c = await requireWritable(); await owned(c, v.contentId);
     if (v.insightAssetId) { const a = ok<any>(await c.sb.from('content_assets').select('id').eq('id', v.insightAssetId).eq('content_id', v.contentId).eq('kind', 'insight').maybeSingle()); if (!a) throw new UserError('That screenshot no longer exists.'); }
     const d = ok<{ id: string }>(await c.sb.from('content_snapshots').insert({ workspace_id: c.ws.id, content_id: v.contentId, measured_on: v.measuredOn, period: v.period, period_note: v.periodNote,
       views: v.views, reach: v.reach, likes: v.likes, comments: v.comments, shares: v.shares, saves: v.saves, profile_visits: v.profileVisits, link_clicks: v.linkClicks, leads: v.leads,
@@ -89,7 +89,7 @@ export async function addSnapshot(raw: unknown): Promise<ActionResult & { id?: s
 
 export async function deleteSnapshot(id: string): Promise<ActionResult> {
   try {
-    on(); const c = await requireWritable();
+    await on(); const c = await requireWritable();
     const s = ok<any>(await c.sb.from('content_snapshots').select('content_id').eq('id', uuid.parse(id)).eq('workspace_id', c.ws.id).maybeSingle());
     if (!s) throw new UserError('Those metrics were already removed.');
     ok(await c.sb.from('content_snapshots').delete().eq('id', id).eq('workspace_id', c.ws.id));
@@ -103,7 +103,7 @@ const Prepare = z.object({ contentId: uuid, kind: z.enum(['media', 'frame', 'ins
 /** Checks the file before upload and issues a one-time signed upload URL for a path inside this workspace. */
 export async function prepareUpload(raw: unknown): Promise<ActionResult & { path?: string; token?: string }> {
   try {
-    on(); const v = Prepare.parse(raw); const c = await requireWritable(); await owned(c, v.contentId);
+    await on(); const v = Prepare.parse(raw); const c = await requireWritable(); await owned(c, v.contentId);
     const L = limits();
     const bad = checkUpload(v.kind as AssetKind, v.mime, v.bytes, L); if (bad) throw new UserError(bad);
     if (v.kind === 'media' && v.mime.startsWith('video/') && v.durationSeconds && v.durationSeconds > L.videoSeconds + 1)
@@ -127,7 +127,7 @@ const Confirm = z.object({ contentId: uuid, path: z.string().max(300), kind: z.e
 /** Records an uploaded file after checking what actually arrived in storage. A file that fails the checks is deleted. */
 export async function confirmUpload(raw: unknown): Promise<ActionResult & { id?: string }> {
   try {
-    on(); const v = Confirm.parse(raw); const c = await requireWritable(); await owned(c, v.contentId);
+    await on(); const v = Confirm.parse(raw); const c = await requireWritable(); await owned(c, v.contentId);
     const dir = `${c.ws.id}/${v.contentId}`, name = v.path.slice(dir.length + 1);
     if (!v.path.startsWith(dir + '/') || !new RegExp(`^${v.kind}-[0-9a-f-]{36}\\.(mp4|mov|jpg|png|webp)$`).test(name)) throw new UserError('That upload doesn’t belong to this item.');
     const { data: found, error } = await c.sb.storage.from('content').list(dir, { search: name, limit: 5 });
@@ -159,7 +159,7 @@ export async function confirmUpload(raw: unknown): Promise<ActionResult & { id?:
 
 export async function deleteAsset(id: string): Promise<ActionResult> {
   try {
-    on(); const c = await requireWritable();
+    await on(); const c = await requireWritable();
     const a = ok<any>(await c.sb.from('content_assets').select('id,path,kind,content_id').eq('id', uuid.parse(id)).eq('workspace_id', c.ws.id).maybeSingle());
     if (!a) throw new UserError('That file was already removed.');
     // Removing the original also removes the frames taken from it.
@@ -175,7 +175,7 @@ export async function deleteAsset(id: string): Promise<ActionResult> {
  *  Cached on the asset: asking again returns the same reading without another AI call. Nothing is saved as a metric here. */
 export async function extractInsights(assetId: string, again = false): Promise<ActionResult & { extraction?: Extraction }> {
   try {
-    on(); const c = await requireWritable();
+    await on(); const c = await requireWritable();
     const a = ok<any>(await c.sb.from('content_assets').select('id,path,mime,bytes,kind,extraction').eq('id', uuid.parse(assetId)).eq('workspace_id', c.ws.id).maybeSingle());
     if (!a || a.kind !== 'insight') throw new UserError('That screenshot no longer exists.');
     if (a.extraction && !again) return { ok: true, extraction: a.extraction };
@@ -199,7 +199,7 @@ const CHECKIN_TITLE: Record<string, string> = { '24h': '24-hour check-in', '48h'
 /** Runs a Creative Review or a Performance Check-In. Identical inputs return the existing report (no new AI cost). */
 export async function analyzeContent(raw: unknown): Promise<ActionResult & { reportId?: string; cached?: boolean }> {
   try {
-    on();
+    await on();
     const v = z.object({ contentId: uuid, mode: z.enum(['creative', 'performance', 'business']), snapshotId: uuid.optional() }).parse(raw);
     const c = await requireWritable();
     const itemRow = ok<any>(await c.sb.from('content_items').select('*').eq('workspace_id', c.ws.id).eq('id', v.contentId).maybeSingle());
@@ -290,7 +290,7 @@ Task: ${v.mode === 'creative' ? 'Write a Creative Review of this content. There 
 
 export async function saveReport(id: string, keep = true): Promise<ActionResult> {
   try {
-    on(); const c = await requireWritable();
+    await on(); const c = await requireWritable();
     const r = ok<any>(await c.sb.from('content_reports').update({ saved_at: keep ? new Date().toISOString() : null }).eq('id', uuid.parse(id)).eq('workspace_id', c.ws.id).select('content_id').maybeSingle());
     if (!r) throw new UserError('That analysis no longer exists.');
     revalidatePath(`/content-intelligence/${r.content_id}`);
@@ -300,7 +300,7 @@ export async function saveReport(id: string, keep = true): Promise<ActionResult>
 
 export async function deleteReport(id: string): Promise<ActionResult> {
   try {
-    on(); const c = await requireWritable();
+    await on(); const c = await requireWritable();
     const r = ok<any>(await c.sb.from('content_reports').delete().eq('id', uuid.parse(id)).eq('workspace_id', c.ws.id).select('content_id').maybeSingle());
     if (!r) throw new UserError('That analysis was already deleted.');
     revalidatePath(`/content-intelligence/${r.content_id}`);
@@ -311,7 +311,7 @@ export async function deleteReport(id: string): Promise<ActionResult> {
 /** A follow-up question about an analysis. Uses the analysis, its sources, and the creator's other content of the same kind. */
 export async function askAboutReport(raw: unknown): Promise<ActionResult & { reply?: FollowUp }> {
   try {
-    on();
+    await on();
     const v = z.object({ reportId: uuid, question: z.string().trim().min(2, 'Ask a question.').max(1000, 'Keep the question under 1,000 characters.') }).parse(raw);
     const c = await requireWritable();
     const rep = ok<any>(await c.sb.from('content_reports').select('*').eq('id', v.reportId).eq('workspace_id', c.ws.id).maybeSingle());
@@ -359,7 +359,7 @@ Question: ${v.question}`;
 /** Saves a suggestion as a content idea (only when the creator clicks Save). */
 export async function saveIdea(raw: unknown): Promise<ActionResult> {
   try {
-    on(); const v = z.object({ reportId: uuid, text: z.string().trim().min(1).max(1000) }).parse(raw); const c = await requireWritable();
+    await on(); const v = z.object({ reportId: uuid, text: z.string().trim().min(1).max(1000) }).parse(raw); const c = await requireWritable();
     const rep = ok<any>(await c.sb.from('content_reports').select('id,content_id').eq('id', v.reportId).eq('workspace_id', c.ws.id).maybeSingle());
     if (!rep) throw new UserError('That analysis no longer exists.');
     ok(await c.sb.from('content_ideas').insert({ workspace_id: c.ws.id, content_id: rep.content_id, report_id: rep.id, text: v.text }));
@@ -371,7 +371,7 @@ export async function saveIdea(raw: unknown): Promise<ActionResult> {
 /** Turns a suggestion into a task (only when the creator clicks). Uses the normal tasks table; nothing else changes. */
 export async function saveIdeaAsTask(raw: unknown): Promise<ActionResult> {
   try {
-    on(); const v = z.object({ reportId: uuid, text: z.string().trim().min(1).max(1000) }).parse(raw); const c = await requireWritable();
+    await on(); const v = z.object({ reportId: uuid, text: z.string().trim().min(1).max(1000) }).parse(raw); const c = await requireWritable();
     const rep = ok<any>(await c.sb.from('content_reports').select('id,content_id').eq('id', v.reportId).eq('workspace_id', c.ws.id).maybeSingle());
     if (!rep) throw new UserError('That analysis no longer exists.');
     const item = ok<any>(await c.sb.from('content_items').select('title').eq('id', rep.content_id).single());
@@ -384,7 +384,7 @@ export async function saveIdeaAsTask(raw: unknown): Promise<ActionResult> {
 
 export async function setIdeaDone(id: string, done: boolean): Promise<ActionResult> {
   try {
-    on(); const c = await requireWritable();
+    await on(); const c = await requireWritable();
     const r = ok<any>(await c.sb.from('content_ideas').update({ done }).eq('id', uuid.parse(id)).eq('workspace_id', c.ws.id).select('content_id').maybeSingle());
     if (!r) throw new UserError('That idea no longer exists.');
     revalidatePath(`/content-intelligence/${r.content_id}`);
@@ -395,7 +395,7 @@ export async function setIdeaDone(id: string, done: boolean): Promise<ActionResu
 /** Links this post to a partnership or an income entry the creator already has. A record, not a claim of cause. */
 export async function linkContent(raw: unknown): Promise<ActionResult> {
   try {
-    on();
+    await on();
     const v = z.object({ contentId: uuid, dealId: uuid.optional(), incomeId: uuid.optional(), note: z.string().trim().max(200).default('') })
       .refine(x => !!x.dealId !== !!x.incomeId, 'Choose a partnership or an income entry.').parse(raw);
     const c = await requireWritable(); await owned(c, v.contentId);
@@ -408,7 +408,7 @@ export async function linkContent(raw: unknown): Promise<ActionResult> {
 
 export async function unlinkContent(id: string): Promise<ActionResult> {
   try {
-    on(); const c = await requireWritable();
+    await on(); const c = await requireWritable();
     const r = ok<any>(await c.sb.from('content_links').delete().eq('id', uuid.parse(id)).eq('workspace_id', c.ws.id).select('content_id').maybeSingle());
     if (!r) throw new UserError('That link was already removed.');
     revalidatePath(`/content-intelligence/${r.content_id}`);
