@@ -10,6 +10,9 @@ import { requireWritable, friendlyError, UserError } from '@/lib/auth';
 import { ContentSchema, SnapshotSchema, checkUpload, extFor, sniffMatches, type AssetKind } from '@/lib/content/model';
 import { limits, workspaceBytes } from '@/lib/content/server';
 import type { ActionResult } from '@/lib/types';
+import { getProvider, AIUnavailable } from '@/lib/ai/provider';
+import { underAILimit, recordAI } from '@/lib/ai/ratelimit';
+import { INSIGHTS_SYSTEM, toExtraction, type Extraction } from '@/lib/content/extract';
 
 const uuid = z.string().uuid();
 
@@ -156,5 +159,28 @@ export async function deleteAsset(id: string): Promise<ActionResult> {
     ok(await c.sb.from('content_assets').delete().in('id', rows.map(r => r.id)));
     revalidatePath(`/content-intelligence/${a.content_id}`); revalidatePath('/content-intelligence');
     return { ok: true, message: 'File deleted' };
+  } catch (e) { return { ok: false, error: friendlyError(e) }; }
+}
+
+/** Reads the metrics visible in an insights screenshot and returns them as proposals for the creator to check.
+ *  Cached on the asset: asking again returns the same reading without another AI call. Nothing is saved as a metric here. */
+export async function extractInsights(assetId: string, again = false): Promise<ActionResult & { extraction?: Extraction }> {
+  try {
+    on(); const c = await requireWritable();
+    const a = ok<any>(await c.sb.from('content_assets').select('id,path,mime,bytes,kind,extraction').eq('id', uuid.parse(assetId)).eq('workspace_id', c.ws.id).maybeSingle());
+    if (!a || a.kind !== 'insight') throw new UserError('That screenshot no longer exists.');
+    if (a.extraction && !again) return { ok: true, extraction: a.extraction };
+    if (Number(a.bytes) > 4.5 * 1024 * 1024) throw new UserError('That screenshot is too large to read. Take a new one, or enter the numbers by hand.');
+    if (!(await underAILimit(c.sb, c.user.id))) throw new UserError('You’ve reached this hour’s limit for AI requests. Try again later, or enter the numbers by hand.');
+    const { data: file, error } = await c.sb.storage.from('content').download(a.path);
+    if (error || !file) throw new UserError('The screenshot couldn’t be opened. Upload it again.');
+    const base64 = Buffer.from(await file.arrayBuffer()).toString('base64');
+    let r;
+    try { r = await getProvider().readImages({ system: INSIGHTS_SYSTEM, instruction: 'Transcribe the analytics in this screenshot.', images: [{ mime: a.mime, base64 }], maxTokens: 900 }); }
+    catch (e) { if (e instanceof AIUnavailable) throw new UserError('Reading screenshots isn’t available right now. Enter the numbers by hand.'); throw e; }
+    await recordAI(c.sb, c.user.id, 'content', r);
+    const extraction = toExtraction(r.text);
+    ok(await c.sb.from('content_assets').update({ extraction, extracted_at: new Date().toISOString() }).eq('id', a.id));
+    return { ok: true, extraction };
   } catch (e) { return { ok: false, error: friendlyError(e) }; }
 }

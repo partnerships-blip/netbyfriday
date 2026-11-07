@@ -9,7 +9,7 @@ performance over time, and get AI reviews grounded only in what they provided. B
 |---|---|
 | 1. Content Library and database | Built: library (grid/table, search, platform filter, sort), item page, all tables with RLS |
 | 2. Secure upload, link and manual entry | Built: private bucket, signed one-time uploads, server-side size/type/signature checks, frames sampled in the browser, link detection, metrics history |
-| 3. Insight screenshot extraction and confirmation | Next |
+| 3. Insight screenshot extraction and confirmation | Built: AI transcribes labels and value text; numbers parsed by our code; unclear values left empty and flagged; period must be confirmed; reading cached per screenshot |
 | 4. Creative Review and Performance Check-In | Planned |
 | 5. Follow-up conversation | Planned |
 | 6. Business Impact links | Tables ready (`content_links`); UI planned |
@@ -44,6 +44,18 @@ The flag is off by default. To show it on a deployment, add `contentIntel` to `N
 A new original replaces the previous one and its frames. Deleting an item deletes its files, snapshots, reports,
 conversations and links.
 
+## Reading insights screenshots
+
+1. The creator uploads a screenshot (same verified upload path as above). It is read straight away.
+2. The model is asked only to transcribe: each metric's label, the value exactly as shown ("2,599", "1.2K", "4.2 sec",
+   "41.8%"), whether it was clearly legible, and the period and date text shown.
+3. Our code turns that text into numbers (`lib/content/extract.ts`). A value that was illegible or doesn't parse cleanly
+   is left empty and flagged "Check this"; it can only be saved if the creator types it.
+4. The period ("Last 24 hours", "Lifetime", …) is mapped to one of ours; if it can't be, the creator must choose before
+   saving. The date shown on the screenshot becomes "Checked on" (never a future date).
+5. Confirming saves a new snapshot marked "From your screenshot", linked to the screenshot. The reading itself is cached
+   on the screenshot, so opening the review again doesn't call the AI again.
+
 ## Limits (beta)
 
 | Setting (Vercel env, optional) | Default |
@@ -73,7 +85,9 @@ in `supabase/tests/database/rls_isolation.test.sql`.
 - Storage: Supabase Storage is included up to the plan's quota (1 GB on Free, 100 GB on Pro), then billed per GB. The
   per-workspace cap above keeps beta usage predictable.
 - Bandwidth: videos are served by signed URL; each view of the item page streams the video only if played.
-- AI: nothing yet in milestones 1–2. Later analyses send frames (images) and text to the existing Anthropic provider;
+- AI, screenshot reading: one vision call per screenshot (about 1,500–2,000 input and ~300 output tokens; roughly 1–2¢ on
+  a Sonnet-class model). Cached, counted in the hourly cap, tokens stored in `ai_usage`.
+- AI, later analyses: send frames (images) and text to the existing Anthropic provider;
   each analysis is counted against the per-user hourly cap and its token use recorded.
 - Would materially increase costs (not built): automatic speech-to-text for voiceovers (needs a second AI vendor),
   server-side video processing, analysing every frame, or unlimited analyses.
@@ -90,6 +104,7 @@ drop policy if exists storage_content_insert on storage.objects;
 drop policy if exists storage_content_delete on storage.objects;
 -- Empty the bucket first in the Supabase dashboard (Storage > content), then:
 delete from storage.buckets where id = 'content';
+alter table public.content_assets drop column if exists extraction, drop column if exists extracted_at; -- if the tables are kept
 alter table public.ai_usage drop constraint ai_usage_kind_check;
 alter table public.ai_usage add constraint ai_usage_kind_check check (kind in ('advisor','draft','contract'));
 ```

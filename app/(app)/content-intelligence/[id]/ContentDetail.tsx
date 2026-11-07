@@ -12,7 +12,9 @@ import { PLATFORM_LABEL, FORMAT_LABEL, PERIOD_LABEL, METRICS, checkUpload, LIMIT
 import { contentFields, deriveFromLink, snapshotFields, emptySnapshot } from '@/lib/content/fields';
 import { sampleFrames, videoDuration } from '@/lib/content/frames';
 import type { Asset, ContentItem, Snapshot } from '@/lib/content/server';
-import { updateContent, deleteContent, addSnapshot, deleteSnapshot, prepareUpload, confirmUpload, deleteAsset } from '../actions';
+import { updateContent, deleteContent, addSnapshot, deleteSnapshot, prepareUpload, confirmUpload, deleteAsset, extractInsights } from '../actions';
+import { InsightReview } from './InsightReview';
+import type { Extraction } from '@/lib/content/extract';
 
 type Lim = { videoMb: number; imageMb: number; videoSeconds: number; frames: number; insights: number };
 const fmtMetric = (k: string, v: number | null) => v == null ? '—' : k === 'skipRate' || k === 'retentionPct' ? `${v}%` : k === 'avgWatchSeconds' ? `${v}s` : v.toLocaleString('en-US');
@@ -22,6 +24,7 @@ export function ContentDetail({ item, assets, snapshots, today, readOnly, limits
   const [editing, setEditing] = useState(false);
   const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState('');
+  const [review, setReview] = useState<{ assetId: string; extraction: Extraction } | null>(null);
   const mediaInput = useRef<HTMLInputElement>(null), shotInput = useRef<HTMLInputElement>(null);
   const media = assets.find(a => a.kind === 'media');
   const frames = assets.filter(a => a.kind === 'frame');
@@ -36,6 +39,7 @@ export function ContentDetail({ item, assets, snapshots, today, readOnly, limits
     if (error) throw new Error(/size|large/i.test(error.message) ? 'That file is too large.' : 'The upload didn’t finish. Check your connection and try again.');
     const c = await confirmUpload({ contentId: item.id, path: p.path, kind, ...extra });
     if (!c.ok) throw new Error(c.error);
+    return c.id!;
   }
 
   async function uploadMedia(f: File | undefined) {
@@ -65,9 +69,20 @@ export function ContentDetail({ item, assets, snapshots, today, readOnly, limits
   async function uploadShot(f: File | undefined) {
     if (!f || readOnly) return;
     const bad = checkUpload('insight', f.type, f.size, lim); if (bad) return toast(bad);
-    try { setBusy('Uploading screenshot…'); await put('insight', f, f.type); toast('Screenshot added'); }
-    catch (e: any) { toast(e.message || 'Upload failed'); }
-    finally { setBusy(''); router.refresh(); }
+    let id = '';
+    try { setBusy('Uploading screenshot…'); id = await put('insight', f, f.type); toast('Screenshot added'); }
+    catch (e: any) { toast(e.message || 'Upload failed'); setBusy(''); return; }
+    router.refresh();
+    await read(id);
+  }
+
+  /** Reads the screenshot (or reuses the saved reading) and opens the review. */
+  async function read(assetId: string, again = false) {
+    setBusy('Reading the numbers…');
+    const r = await extractInsights(assetId, again);
+    setBusy('');
+    if (!r.ok) return toast(r.error);
+    setReview({ assetId, extraction: r.extraction! });
   }
 
   const remove = async (id: string, what: string) => { setBusy(`Deleting ${what}…`); const r = await deleteAsset(id); setBusy(''); toast(r.ok ? r.message ?? 'Deleted' : r.error); router.refresh(); };
@@ -128,7 +143,9 @@ export function ContentDetail({ item, assets, snapshots, today, readOnly, limits
         {shots.length > 0 && <div className="flex min-w-0 gap-2 overflow-x-auto pb-1">{shots.map(s => (
           <figure key={s.id} className="flex flex-none flex-col items-center gap-1">
             <a href={s.url} target="_blank" rel="noopener noreferrer"><img src={s.url} alt="Insights screenshot" className="h-36 rounded-[10px] border border-line object-cover" /></a>
-            {!readOnly && <button className="text-[12px] text-sub underline" onClick={() => remove(s.id, 'screenshot')}>Delete</button>}
+            {!readOnly && <span className="flex gap-2">
+              <button className="text-[12px] font-semibold text-ink underline" disabled={!!busy} onClick={() => read(s.id)}>Check the numbers</button>
+              <button className="text-[12px] text-sub underline" onClick={() => remove(s.id, 'screenshot')}>Delete</button></span>}
           </figure>))}</div>}
         {!snapshots.length ? <p className="text-[14px] text-sub">No numbers yet. Add them from your app’s insights (24 hours, 7 days, lifetime…). Every field is optional, and blanks stay blank rather than counting as zero.</p> : (
           <div className="relative overflow-x-auto rounded-[12px] border border-line">
@@ -150,6 +167,8 @@ export function ContentDetail({ item, assets, snapshots, today, readOnly, limits
         initial={{ url: item.url, title: item.title, platform: item.platform, format: item.format, publishedOn: item.publishedOn ?? '', category: item.category, goal: item.goal, caption: item.caption, description: item.description, transcript: item.transcript }}
         action={async v => { const r = await updateContent({ ...v, id: item.id }); if (r.ok) router.refresh(); return r; }}
         deleteLabel="Delete this content" onDelete={async () => { const r = await deleteContent(item.id); if (r.ok) router.push('/content-intelligence'); return r; }} />
+      <InsightReview open={!!review} onClose={() => setReview(null)} extraction={review?.extraction ?? null} contentId={item.id} assetId={review?.assetId ?? ''} today={today}
+        imageUrl={shots.find(x => x.id === review?.assetId)?.url} onSaved={() => router.refresh()} onManual={() => setAdding(true)} />
       <FormModal open={adding} onClose={() => setAdding(false)} title="Add metrics" submitLabel="Save metrics" fields={snapshotFields(today)} initial={emptySnapshot(today)}
         note="Copy the numbers from your app’s insights. Leave anything you don’t have blank. Each check-in is saved separately, so you can see how the post changes over time."
         action={async v => { const r = await addSnapshot({ ...v, contentId: item.id, source: 'creator' }); if (r.ok) router.refresh(); return r; }} />

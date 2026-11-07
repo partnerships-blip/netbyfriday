@@ -36,6 +36,20 @@ http.createServer((req, res) => {
       res.writeHead(200, { 'content-type': 'application/json' });
       return res.end(JSON.stringify({ content: [{ type: 'text', text: readContract(doc?.source?.type === 'text' ? doc.source.data : SAMPLE) }] }));
     }
+    if (String(system).startsWith('You read screenshots of social media analytics')) {
+      // Stand-in for the vision model: confirms it was sent a real PNG, then returns what tests/e2e/fixtures/sample-insights.png shows.
+      const img = (messages[0]?.content ?? []).find(b => b.type === 'image');
+      const png = img && Buffer.from(img.source.data, 'base64').subarray(1, 4).toString() === 'PNG';
+      const reading = png ? { platform: 'instagram', period_text: 'Last 24 hours', date_text: 'Nov 6', notes: '', metrics: [
+        { key: 'views', label: 'Views', value_text: '2,599', legible: true }, { key: 'reach', label: 'Accounts reached', value_text: '1,842', legible: true },
+        { key: 'likes', label: 'Likes', value_text: '211', legible: true }, { key: 'comments', label: 'Comments', value_text: '29', legible: true },
+        { key: 'shares', label: 'Shares', value_text: '26', legible: true }, { key: 'saves', label: 'Saves', value_text: '48', legible: true },
+        { key: 'avgWatchSeconds', label: 'Average watch time', value_text: '4.2 sec', legible: true }, { key: 'skipRate', label: 'Skip rate', value_text: '41.8%', legible: true },
+        { key: 'profileVisits', label: 'Profile visits', value_text: '17', legible: true }] }
+        : { platform: 'unknown', period_text: '', date_text: '', metrics: [], notes: 'Not an analytics screenshot' };
+      res.writeHead(200, { 'content-type': 'application/json' });
+      return res.end(JSON.stringify({ content: [{ type: 'text', text: JSON.stringify(reading) }], usage: { input_tokens: 1650, output_tokens: 310 } }));
+    }
     const question = String(messages[messages.length - 1]?.content ?? '');
     const send = text => { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ content: [{ type: 'text', text }] })); };
     if (system.startsWith('You write short business emails')) return send('Subject: Quick follow-up on the invoice\n\nHi [Name],\n\nJust checking in on the open balance. Thank you!\n\nAvery');

@@ -59,16 +59,35 @@ test.describe.serial('content intelligence', () => {
     expect(await page.getByRole('img', { name: /^Frame at / }).count()).toBeGreaterThanOrEqual(5);
     await expect(page.getByText('Length')).toBeVisible(); await expect(page.getByText('8s', { exact: true })).toBeVisible();
 
+    // Insights screenshot: read, shown for review, saved only after confirming.
     await page.getByLabel('Insights screenshot').setInputFiles(fx('sample-insights.png'));
-    await expect(page.getByText('Screenshot added').first()).toBeVisible({ timeout: 20000 });
-    await expect(page.getByRole('img', { name: 'Insights screenshot' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Check the numbers' })).toBeVisible({ timeout: 30000 });
+    const dlg = page.getByRole('dialog');
+    await expect(dlg.getByLabel('These numbers cover *')).toHaveValue('24h');           // from "Last 24 hours"
+    await expect(dlg.getByLabel('Views')).toHaveValue('2599');
+    await expect(dlg.getByLabel('Accounts reached')).toHaveValue('1842');
+    await expect(dlg.getByLabel('Avg. watch time (sec)')).toHaveValue('4.2');
+    await expect(dlg.getByLabel('Skip rate (%)')).toHaveValue('41.8');
+    await expect(dlg.getByLabel('Link clicks')).toHaveValue('');                       // not in the screenshot: stays blank
+    await expect(dlg.getByText('Not in the screenshot').first()).toBeVisible();
+    await dlg.getByLabel('Saves').fill('49');                                           // the creator can correct anything
+    await dlg.getByRole('button', { name: 'Confirm and save' }).click();
+    await expect(page.getByText('Metrics confirmed and saved').first()).toBeVisible();
+    await expect(page.getByRole('cell', { name: '1,842' })).toBeVisible();
+    await expect(page.getByRole('cell', { name: '49', exact: true })).toBeVisible();
+    await expect(page.getByText('From your screenshot').first()).toBeVisible();
 
-    // Metrics by hand: blanks stay blank; a second check-in is kept alongside the first.
-    await page.getByRole('button', { name: 'Add metrics' }).click();
-    await page.getByLabel('Views').fill('2599'); await page.getByLabel('Shares').fill('26'); await page.getByLabel('Skip rate (%)').fill('41.8');
-    await page.getByRole('button', { name: 'Save metrics' }).click();
-    await expect(page.getByRole('cell', { name: '2,599' })).toBeVisible();
-    await page.getByRole('button', { name: 'Add metrics' }).click();
+    // Checking again reuses the saved reading: no second AI call.
+    await page.getByRole('button', { name: 'Check the numbers' }).first().click();
+    await expect(page.getByRole('heading', { name: 'Check the numbers' })).toBeVisible();
+    await page.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click();
+
+    // A picture that isn't an analytics screen is not turned into numbers.
+    await page.getByLabel('Insights screenshot').setInputFiles(fx('not-insights.jpg'));
+    await expect(page.getByRole('heading', { name: 'We couldn’t read this screenshot' })).toBeVisible({ timeout: 30000 });
+    await page.getByRole('button', { name: 'Enter by hand' }).click();
+
+    // A later check-in by hand is kept alongside the first.
     await page.getByLabel('These numbers cover').selectOption('7d'); await page.getByLabel('Views').fill('9120');
     await page.getByRole('button', { name: 'Save metrics' }).click();
     await expect(page.getByRole('cell', { name: '9,120' })).toBeVisible();
