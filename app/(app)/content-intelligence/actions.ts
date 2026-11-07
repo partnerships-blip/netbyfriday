@@ -13,6 +13,15 @@ import type { ActionResult } from '@/lib/types';
 import { getProvider, AIUnavailable } from '@/lib/ai/provider';
 import { underAILimit, recordAI } from '@/lib/ai/ratelimit';
 import { INSIGHTS_SYSTEM, toExtraction, type Extraction } from '@/lib/content/extract';
+import { createHash } from 'node:crypto';
+import { PERIOD_LABEL, FORMAT_LABEL, PLATFORM_LABEL } from '@/lib/content/model';
+import { comparableSet, compare, performanceFacts } from '@/lib/content/compare';
+import { REPORT_SYSTEM, PROMPT_VERSION, verifyReport, standOut, numbersIn, type Source, type Mode } from '@/lib/content/report';
+import { mapItem, mapSnapshot } from '@/lib/content/server';
+import { FOLLOWUP_SYSTEM, verifyFollowUp, type FollowUp } from '@/lib/content/followup';
+import { loadApp } from '@/lib/data/load';
+import { impactFor, byCategory, type LinkRow } from '@/lib/content/business';
+import { formatCents } from '@/lib/finance/core.js';
 
 const uuid = z.string().uuid();
 
@@ -182,5 +191,227 @@ export async function extractInsights(assetId: string, again = false): Promise<A
     const extraction = toExtraction(r.text);
     ok(await c.sb.from('content_assets').update({ extraction, extracted_at: new Date().toISOString() }).eq('id', a.id));
     return { ok: true, extraction };
+  } catch (e) { return { ok: false, error: friendlyError(e) }; }
+}
+
+const CHECKIN_TITLE: Record<string, string> = { '24h': '24-hour check-in', '48h': '48-hour check-in', '7d': '7-day check-in', '30d': '30-day check-in', lifetime: 'Lifetime check-in', custom: 'Check-in' };
+
+/** Runs a Creative Review or a Performance Check-In. Identical inputs return the existing report (no new AI cost). */
+export async function analyzeContent(raw: unknown): Promise<ActionResult & { reportId?: string; cached?: boolean }> {
+  try {
+    on();
+    const v = z.object({ contentId: uuid, mode: z.enum(['creative', 'performance', 'business']), snapshotId: uuid.optional() }).parse(raw);
+    const c = await requireWritable();
+    const itemRow = ok<any>(await c.sb.from('content_items').select('*').eq('workspace_id', c.ws.id).eq('id', v.contentId).maybeSingle());
+    if (!itemRow) throw new UserError('That content item no longer exists.');
+    const item = mapItem(itemRow);
+    const assets = ok<any[]>(await c.sb.from('content_assets').select('id,kind,path,mime,frame_at_seconds').eq('content_id', item.id).in('kind', ['media', 'frame']).order('frame_at_seconds', { ascending: true, nullsFirst: true }));
+    const media = assets.find(a => a.kind === 'media'); const frames = assets.filter(a => a.kind === 'frame');
+    const image = media && media.mime.startsWith('image/') ? media : null;
+    const text = (k: string, label: string, t: string): Source[] => t.trim() ? [{ ref: k, label, text: t.trim().slice(0, 4000), numbers: numbersIn(t) }] : [];
+    const sources: Source[] = [
+      ...frames.map((f, i) => ({ ref: `frame:${i + 1}`, label: `Frame at ${Number(f.frame_at_seconds)}s`, text: `Still frame at ${Number(f.frame_at_seconds)} seconds`, numbers: [Number(f.frame_at_seconds)] })),
+      ...(image ? [{ ref: 'image', label: 'The image', text: 'The uploaded image', numbers: [] }] : []),
+      ...text('title', 'Title', item.title), ...text('caption', 'Caption', item.caption), ...text('description', 'Your description', item.description),
+      ...text('transcript', 'Voiceover / on-screen text', item.transcript), ...text('goal', 'Goal', item.goal), ...text('category', 'Category', item.category),
+      ...(item.durationSeconds ? [{ ref: 'duration', label: 'Length', text: `${item.durationSeconds} seconds long`, numbers: [item.durationSeconds] }] : [])
+    ];
+    const autoLimits: string[] = [];
+    if (v.mode === 'creative' && !frames.length && !image && !item.caption && !item.description && !item.transcript)
+      throw new UserError('Add the video, an image, or at least the caption and what happens in it, so there’s something to review.');
+    if (frames.length) autoLimits.push(`The review looked at ${frames.length} still frames (${frames.map(f => Number(f.frame_at_seconds) + 's').join(', ')}), not motion or sound.`);
+    else if (media && media.mime.startsWith('video/')) autoLimits.push('Frames couldn’t be taken from this video in your browser, so visuals weren’t reviewed.');
+    else if (!image) autoLimits.push('The original wasn’t uploaded, so only the text you provided was reviewed.');
+    if (!item.transcript) autoLimits.push('No voiceover or on-screen text was added, so spoken words weren’t assessed. NETBYFRIDAY doesn’t transcribe audio.');
+
+    let overview = null, snapshotId: string | null = null, hasMetrics = false, title = 'Creative review';
+    if (v.mode === 'performance') {
+      const snaps = ok<any[]>(await c.sb.from('content_snapshots').select('*').eq('workspace_id', c.ws.id)).map(r => ({ ...mapSnapshot(r), contentId: r.content_id }));
+      const target = v.snapshotId ? snaps.find(s => s.id === v.snapshotId && s.contentId === item.id) : snaps.filter(s => s.contentId === item.id).sort((a, b) => (b.measuredOn + b.createdAt).localeCompare(a.measuredOn + a.createdAt))[0];
+      if (!target) throw new UserError('Add this post’s numbers first (enter them or upload an insights screenshot).');
+      const items = ok<any[]>(await c.sb.from('content_items').select('id,platform,format,title').eq('workspace_id', c.ws.id));
+      const set = comparableSet({ id: item.id, platform: item.platform, format: item.format, title: item.title }, target.period, items, snaps);
+      const comps = compare(target, set);
+      const periodLabel = target.period === 'custom' ? (target.periodNote || 'custom period') : PERIOD_LABEL[target.period].toLowerCase();
+      const facts = performanceFacts(target, periodLabel, comps, set.length, FORMAT_LABEL[item.format]);
+      sources.push(...facts);
+      overview = { lines: standOut(comps, target as any), comparisons: comps, periodLabel };
+      snapshotId = target.id; hasMetrics = true;
+      title = target.period === 'custom' ? `Check-in: ${target.periodNote}` : CHECKIN_TITLE[target.period];
+      autoLimits.push(`Numbers are the ones you ${target.source === 'screenshot' ? 'confirmed from your screenshot' : 'entered'} (checked ${target.measuredOn}); they weren’t retrieved from ${PLATFORM_LABEL[item.platform]}.`);
+      autoLimits.push('Patterns in numbers show what happened, not why. Treat explanations as ideas to test.');
+    }
+
+    if (v.mode === 'business') {
+      title = 'Business impact';
+      const app = await loadApp();
+      const links: LinkRow[] = ok<any[]>(await c.sb.from('content_links').select('id,content_id,deal_id,income_id,note').eq('workspace_id', c.ws.id)).map(l => ({ id: l.id, contentId: l.content_id, dealId: l.deal_id, incomeId: l.income_id, note: l.note }));
+      const imp = impactFor(item.id, links, app.input);
+      if (!imp.deals.length && !imp.income.length) throw new UserError('Link this post to a partnership or income first. Business impact works from what you’ve linked.');
+      const $ = (c: number) => formatCents(c);
+      sources.push({ ref: 'b:summary', label: 'Linked to this post', text: `Linked by the creator: ${imp.deals.length} partnership${imp.deals.length === 1 ? '' : 's'} and ${imp.income.length} income entr${imp.income.length === 1 ? 'y' : 'ies'}. Agreed (contracted) fees: ${$(imp.contractedCents)}. Money received so far: ${$(imp.receivedCents)}.${imp.estimatedCents ? ` Estimated fees not yet agreed: ${$(imp.estimatedCents)}.` : ''}`, numbers: [] });
+      imp.deals.forEach((d, i) => sources.push({ ref: `b:deal:${i + 1}`, label: d.label, text: `${d.label}: ${d.feeIsEstimate ? 'estimated fee' : 'agreed fee'} ${$(d.feeCents)}, stage ${d.stage}, received ${$(d.receivedCents)}`, numbers: [] }));
+      imp.income.forEach((e, i) => sources.push({ ref: `b:income:${i + 1}`, label: e.label, text: `${e.label}: ${$(e.amountCents)} received on ${e.receivedOn}`, numbers: [] }));
+      const items = ok<any[]>(await c.sb.from('content_items').select('id,category').eq('workspace_id', c.ws.id));
+      const cats = byCategory(items, links, app.input).filter(r => r.deals || r.receivedCents).slice(0, 6);
+      if (cats.length) sources.push({ ref: 'b:categories', label: 'Your content categories', text: cats.map(r => `${r.category}: ${r.posts} post${r.posts === 1 ? '' : 's'} in your library, ${r.deals} linked partnership${r.deals === 1 ? '' : 's'}, ${$(r.receivedCents)} received`).join('; '), numbers: [] });
+      overview = { lines: [`${imp.deals.length} linked partnership${imp.deals.length === 1 ? '' : 's'}`, `${$(imp.contractedCents)} in agreed fees (contracted, not all received)`, `${$(imp.receivedCents)} received so far`, ...(imp.estimatedCents ? [`${$(imp.estimatedCents)} in estimates you haven’t agreed yet (not counted)`] : [])], comparisons: [], periodLabel: '' } as any;
+      autoLimits.push('These are links you made. They show what this post is associated with in your records, not that it caused those deals or sales.');
+      autoLimits.push('Received means payments and income you’ve recorded; agreed fees aren’t revenue until they’re paid.');
+    }
+
+    const hash = createHash('sha256').update(JSON.stringify({ PROMPT_VERSION, mode: v.mode, item: { ...item, updatedAt: undefined, createdAt: undefined }, assets: assets.map(a => a.id).sort(), snapshotId, sources: sources.map(s => [s.ref, s.text]) })).digest('hex');
+    const cached = ok<any>(await c.sb.from('content_reports').select('id').eq('content_id', item.id).eq('mode', v.mode).eq('input_hash', hash).maybeSingle());
+    if (cached) return { ok: true, reportId: cached.id, cached: true, message: 'Nothing has changed since the last analysis, so here it is again (no new AI use).' };
+
+    if (!(await underAILimit(c.sb, c.user.id))) throw new UserError('You’ve reached this hour’s limit for AI requests. Try again later.');
+    // Images: every frame for a creative review; the opening frames for a check-in (where the hook matters most).
+    const pics = image ? [image] : v.mode === 'creative' ? frames : frames.slice(0, 4);
+    const images: { mime: string; base64: string }[] = [];
+    for (const a of pics) { const { data, error } = await c.sb.storage.from('content').download(a.path); if (error || !data) continue; images.push({ mime: a.mime, base64: Buffer.from(await data.arrayBuffer()).toString('base64') }); }
+    const order = image ? 'The image is the uploaded content (ref "image").' : pics.length ? `Images, in order: ${pics.map((f, i) => `frame:${i + 1} at ${Number(f.frame_at_seconds)}s`).join(', ')}.` : 'No images were provided.';
+    const instruction = `<content>${JSON.stringify({ platform: PLATFORM_LABEL[item.platform], format: FORMAT_LABEL[item.format], published: item.publishedOn })}</content>
+<sources>${JSON.stringify(sources.map(s => ({ ref: s.ref, label: s.label, text: s.text })))}</sources>
+${order}
+Task: ${v.mode === 'creative' ? 'Write a Creative Review of this content. There are no performance numbers: do not comment on performance.' : v.mode === 'business' ? 'Write a Business Impact review: what this content is associated with in the creator’s records (b: refs), what that suggests about their positioning, how they could use it in pitches, and what to make more of. Distinguish agreed fees from money received. Never say the post caused a deal.' : `Write a ${title} using the facts provided. Interpret the calculated numbers; do not compute new ones.`}`;
+    let r;
+    try { r = await getProvider().readImages({ system: REPORT_SYSTEM, instruction, images, maxTokens: 2200 }); }
+    catch (e) { if (e instanceof AIUnavailable) throw new UserError('Analysis isn’t available right now. Try again in a few minutes.'); throw e; }
+    await recordAI(c.sb, c.user.id, 'content', r);
+    if (r.stopReason === 'max_tokens') autoLimits.push('The analysis was cut short; some sections may be missing.');
+    const report = verifyReport(r.text, sources, { mode: v.mode as Mode, title, hasMetrics, overview, autoLimits });
+    if (!report.working.length && !report.improve.length && !report.recommendations.length) throw new UserError('The analysis didn’t produce anything that could be checked against your content. Try again, or add more detail (caption, what happens, voiceover).');
+    report.sources = sources.map(x => ({ ...x, text: x.text.slice(0, 1500) }));
+    const d = ok<{ id: string }>(await c.sb.from('content_reports').insert({ workspace_id: c.ws.id, content_id: item.id, mode: v.mode, snapshot_id: snapshotId, input_hash: hash, report, model: process.env.AI_MODEL ?? '' }).select('id').single());
+    revalidatePath(`/content-intelligence/${item.id}`); revalidatePath('/content-intelligence');
+    return { ok: true, reportId: d.id, message: 'Analysis ready' };
+  } catch (e) { return { ok: false, error: friendlyError(e) }; }
+}
+
+export async function saveReport(id: string, keep = true): Promise<ActionResult> {
+  try {
+    on(); const c = await requireWritable();
+    const r = ok<any>(await c.sb.from('content_reports').update({ saved_at: keep ? new Date().toISOString() : null }).eq('id', uuid.parse(id)).eq('workspace_id', c.ws.id).select('content_id').maybeSingle());
+    if (!r) throw new UserError('That analysis no longer exists.');
+    revalidatePath(`/content-intelligence/${r.content_id}`);
+    return { ok: true, message: keep ? 'Saved to your workspace' : 'Removed from saved' };
+  } catch (e) { return { ok: false, error: friendlyError(e) }; }
+}
+
+export async function deleteReport(id: string): Promise<ActionResult> {
+  try {
+    on(); const c = await requireWritable();
+    const r = ok<any>(await c.sb.from('content_reports').delete().eq('id', uuid.parse(id)).eq('workspace_id', c.ws.id).select('content_id').maybeSingle());
+    if (!r) throw new UserError('That analysis was already deleted.');
+    revalidatePath(`/content-intelligence/${r.content_id}`);
+    return { ok: true, message: 'Analysis deleted' };
+  } catch (e) { return { ok: false, error: friendlyError(e) }; }
+}
+
+/** A follow-up question about an analysis. Uses the analysis, its sources, and the creator's other content of the same kind. */
+export async function askAboutReport(raw: unknown): Promise<ActionResult & { reply?: FollowUp }> {
+  try {
+    on();
+    const v = z.object({ reportId: uuid, question: z.string().trim().min(2, 'Ask a question.').max(1000, 'Keep the question under 1,000 characters.') }).parse(raw);
+    const c = await requireWritable();
+    const rep = ok<any>(await c.sb.from('content_reports').select('*').eq('id', v.reportId).eq('workspace_id', c.ws.id).maybeSingle());
+    if (!rep) throw new UserError('That analysis no longer exists.');
+    const item = mapItem(ok<any>(await c.sb.from('content_items').select('*').eq('id', rep.content_id).single()));
+    const report = rep.report;
+    const sources: Source[] = Array.isArray(report.sources) ? report.sources : [
+      ...(item.caption ? [{ ref: 'caption', label: 'Caption', text: item.caption, numbers: numbersIn(item.caption) }] : []),
+      ...(item.description ? [{ ref: 'description', label: 'Your description', text: item.description, numbers: numbersIn(item.description) }] : [])];
+    // The creator's other content of the same kind, with their latest numbers (for "compare with my last five Reels").
+    const others = ok<any[]>(await c.sb.from('content_items').select('id,title,published_on').eq('workspace_id', c.ws.id).eq('platform', item.platform).eq('format', item.format).neq('id', item.id).order('published_on', { ascending: false, nullsFirst: false }).limit(8));
+    if (others.length) {
+      const snaps = ok<any[]>(await c.sb.from('content_snapshots').select('*').in('content_id', others.map(o => o.id)).order('measured_on', { ascending: false }));
+      others.forEach((o, i) => {
+        const s0 = snaps.find(x => x.content_id === o.id); if (!s0) return;
+        const m = mapSnapshot(s0);
+        const vals = ([['views', 'views'], ['shares', 'shares'], ['comments', 'comments'], ['saves', 'saves'], ['skipRate', 'skip rate %'], ['avgWatchSeconds', 'avg watch s']] as const).filter(([k]) => (m as any)[k] != null);
+        sources.push({ ref: `h:${i + 1}`, label: `${o.title} (${PERIOD_LABEL[m.period as keyof typeof PERIOD_LABEL]})`, text: `${o.title}${o.published_on ? `, published ${o.published_on}` : ''}: ${vals.map(([k, l]) => `${(m as any)[k]} ${l}`).join(', ')} (${PERIOD_LABEL[m.period as keyof typeof PERIOD_LABEL]}, checked ${m.measuredOn})`, numbers: vals.map(([k]) => Number((m as any)[k])) });
+      });
+    }
+    const history = ok<any[]>(await c.sb.from('content_messages').select('role,text').eq('report_id', rep.id).order('created_at', { ascending: false }).limit(6)).reverse();
+    if (!(await underAILimit(c.sb, c.user.id))) throw new UserError('You’ve reached this hour’s limit for AI requests. Try again later.');
+    const frames = ok<any[]>(await c.sb.from('content_assets').select('path,mime,frame_at_seconds').eq('content_id', item.id).in('kind', ['frame', 'media']).order('frame_at_seconds', { ascending: true, nullsFirst: true }));
+    const pics = frames.filter(f => f.mime.startsWith('image/')).slice(0, 3);
+    const images: { mime: string; base64: string }[] = [];
+    for (const a of pics) { const { data } = await c.sb.storage.from('content').download(a.path); if (data) images.push({ mime: a.mime, base64: Buffer.from(await data.arrayBuffer()).toString('base64') }); }
+    const brief = { title: report.title, summary: report.summary, standOut: report.overview?.lines ?? [], working: report.working?.map((p: any) => p.point), improve: report.improve?.map((p: any) => p.point), recommendations: report.recommendations?.map((p: any) => p.point) };
+    const convo = history.map(h => `${h.role === 'user' ? 'Creator' : 'You'}: ${h.role === 'user' ? h.text : (() => { try { return JSON.parse(h.text).answer; } catch { return h.text; } })()}`).join('\n');
+    const instruction = `<analysis>${JSON.stringify(brief)}</analysis>
+<sources>${JSON.stringify(sources.map(s => ({ ref: s.ref, label: s.label, text: s.text })))}</sources>
+${pics.length ? `Images, in order: the opening of the content (${pics.map((p, i) => p.frame_at_seconds != null ? `frame:${i + 1} at ${Number(p.frame_at_seconds)}s` : 'the image').join(', ')}).` : 'No images.'}
+${convo ? `<conversation>\n${convo}\n</conversation>` : ''}
+Question: ${v.question}`;
+    let r;
+    try { r = await getProvider().readImages({ system: FOLLOWUP_SYSTEM, instruction, images, maxTokens: 1400 }); }
+    catch (e) { if (e instanceof AIUnavailable) throw new UserError('The assistant isn’t available right now. Try again in a few minutes.'); throw e; }
+    await recordAI(c.sb, c.user.id, 'content', r);
+    const reply = verifyFollowUp(r.text, sources);
+    const stored = JSON.stringify(reply).slice(0, 7900);
+    ok(await c.sb.from('content_messages').insert([{ workspace_id: c.ws.id, report_id: rep.id, role: 'user', text: v.question }, { workspace_id: c.ws.id, report_id: rep.id, role: 'assistant', text: stored }]));
+    return { ok: true, reply };
+  } catch (e) { return { ok: false, error: friendlyError(e) }; }
+}
+
+/** Saves a suggestion as a content idea (only when the creator clicks Save). */
+export async function saveIdea(raw: unknown): Promise<ActionResult> {
+  try {
+    on(); const v = z.object({ reportId: uuid, text: z.string().trim().min(1).max(1000) }).parse(raw); const c = await requireWritable();
+    const rep = ok<any>(await c.sb.from('content_reports').select('id,content_id').eq('id', v.reportId).eq('workspace_id', c.ws.id).maybeSingle());
+    if (!rep) throw new UserError('That analysis no longer exists.');
+    ok(await c.sb.from('content_ideas').insert({ workspace_id: c.ws.id, content_id: rep.content_id, report_id: rep.id, text: v.text }));
+    revalidatePath(`/content-intelligence/${rep.content_id}`);
+    return { ok: true, message: 'Saved to your content ideas' };
+  } catch (e) { return { ok: false, error: friendlyError(e) }; }
+}
+
+/** Turns a suggestion into a task (only when the creator clicks). Uses the normal tasks table; nothing else changes. */
+export async function saveIdeaAsTask(raw: unknown): Promise<ActionResult> {
+  try {
+    on(); const v = z.object({ reportId: uuid, text: z.string().trim().min(1).max(1000) }).parse(raw); const c = await requireWritable();
+    const rep = ok<any>(await c.sb.from('content_reports').select('id,content_id').eq('id', v.reportId).eq('workspace_id', c.ws.id).maybeSingle());
+    if (!rep) throw new UserError('That analysis no longer exists.');
+    const item = ok<any>(await c.sb.from('content_items').select('title').eq('id', rep.content_id).single());
+    const title = v.text.length > 190 ? v.text.slice(0, 187) + '…' : v.text;
+    ok(await c.sb.from('tasks').insert({ workspace_id: c.ws.id, title, notes: `From the Content Intelligence analysis of “${item.title}”.\n\n${v.text}`.slice(0, 5000) }));
+    revalidatePath('/tasks');
+    return { ok: true, message: 'Added to your tasks' };
+  } catch (e) { return { ok: false, error: friendlyError(e) }; }
+}
+
+export async function setIdeaDone(id: string, done: boolean): Promise<ActionResult> {
+  try {
+    on(); const c = await requireWritable();
+    const r = ok<any>(await c.sb.from('content_ideas').update({ done }).eq('id', uuid.parse(id)).eq('workspace_id', c.ws.id).select('content_id').maybeSingle());
+    if (!r) throw new UserError('That idea no longer exists.');
+    revalidatePath(`/content-intelligence/${r.content_id}`);
+    return { ok: true };
+  } catch (e) { return { ok: false, error: friendlyError(e) }; }
+}
+
+/** Links this post to a partnership or an income entry the creator already has. A record, not a claim of cause. */
+export async function linkContent(raw: unknown): Promise<ActionResult> {
+  try {
+    on();
+    const v = z.object({ contentId: uuid, dealId: uuid.optional(), incomeId: uuid.optional(), note: z.string().trim().max(200).default('') })
+      .refine(x => !!x.dealId !== !!x.incomeId, 'Choose a partnership or an income entry.').parse(raw);
+    const c = await requireWritable(); await owned(c, v.contentId);
+    const { error } = await c.sb.from('content_links').insert({ workspace_id: c.ws.id, content_id: v.contentId, deal_id: v.dealId ?? null, income_id: v.incomeId ?? null, note: v.note });
+    if (error) { if (error.code === '23505') throw new UserError('That’s already linked to this post.'); if (error.code === '23503') throw new UserError('That record no longer exists.'); throw error; }
+    revalidatePath(`/content-intelligence/${v.contentId}`); revalidatePath('/content-intelligence');
+    return { ok: true, message: 'Linked' };
+  } catch (e) { return { ok: false, error: friendlyError(e) }; }
+}
+
+export async function unlinkContent(id: string): Promise<ActionResult> {
+  try {
+    on(); const c = await requireWritable();
+    const r = ok<any>(await c.sb.from('content_links').delete().eq('id', uuid.parse(id)).eq('workspace_id', c.ws.id).select('content_id').maybeSingle());
+    if (!r) throw new UserError('That link was already removed.');
+    revalidatePath(`/content-intelligence/${r.content_id}`);
+    return { ok: true, message: 'Link removed' };
   } catch (e) { return { ok: false, error: friendlyError(e) }; }
 }

@@ -36,6 +36,54 @@ http.createServer((req, res) => {
       res.writeHead(200, { 'content-type': 'application/json' });
       return res.end(JSON.stringify({ content: [{ type: 'text', text: readContract(doc?.source?.type === 'text' ? doc.source.data : SAMPLE) }] }));
     }
+    if (String(system).startsWith('You are the creator’s content strategist inside NETBYFRIDAY') || String(system).startsWith("You are the creator's content strategist inside NETBYFRIDAY")) {
+      const instr = (messages[0]?.content ?? []).find(b => b.type === 'text')?.text ?? '';
+      const srcs = JSON.parse(instr.slice(instr.indexOf('<sources>') + 9, instr.indexOf('</sources>')));
+      const q = instr.slice(instr.lastIndexOf('Question:') + 9).trim();
+      const skip = srcs.find(x => x.ref === 'm:skipRate');
+      const visual = srcs.some(x => x.ref === 'frame:1') ? ['frame:1'] : ['description'];
+      const reply = /hook/i.test(q)
+        ? { answer: 'Here are three openings that put the result first. Most creators see 70% better retention with these.', cites: visual,
+            points: [{ lead: 'Lead with the payoff', point: 'Your opening frame is a title card, so the finished look arrives later than it could.', cites: visual }],
+            ideas: [{ text: 'Open on the finished glow, then: “This takes 3 steps.”' }, { text: '“Your skin, but holiday-party ready.” Close-up first, title second.' }, { text: 'Start mid-application with the glow drops catching the light.' }] }
+        : { answer: skip ? `A skip rate of ${skip.text.split(': ')[1].split(' ')[0]} means a good share of viewers left early. One possibility is that the opening frame doesn’t show the result yet.` : 'There aren’t numbers for this yet.', cites: skip ? ['m:skipRate', ...visual] : [], points: [], ideas: [] };
+      res.writeHead(200, { 'content-type': 'application/json' });
+      return res.end(JSON.stringify({ content: [{ type: 'text', text: JSON.stringify(reply) }], usage: { input_tokens: 3100, output_tokens: 420 }, stop_reason: 'end_turn' }));
+    }
+    if (String(system).startsWith('You are a sharp, kind content strategist')) {
+      // Stand-in for a content report: cites only the sources it was given, plus one ungrounded claim that the checker must remove.
+      const parts = messages[0]?.content ?? [];
+      const instr = parts.find(b => b.type === 'text')?.text ?? '';
+      const srcs = JSON.parse(instr.slice(instr.indexOf('<sources>') + 9, instr.indexOf('</sources>')));
+      const has = r => srcs.some(x => x.ref === r), txt = r => srcs.find(x => x.ref === r)?.text ?? '';
+      const visual = has('frame:1') ? ['frame:1'] : has('image') ? ['image'] : ['description'];
+      const perf = has('m:views');
+      const improve = [{ point: 'Videos under 7 seconds always get 300% more reach.', cites: [] }];
+      const working = [];
+      if (perf && has('c:views')) improve.push({ point: txt('c:views') + '.', cites: ['c:views'] });
+      else if (perf && has('m:skipRate')) improve.push({ point: `A ${txt('m:skipRate').split(': ')[1].split(' ')[0]} skip rate means many viewers left early; the payoff may come too late in the opening.`, cites: ['m:skipRate', ...visual] });
+      improve.push({ point: 'The title card holds the screen before anything happens, so the result arrives later than it could.', cites: visual });
+      if (has('b:summary')) {
+        working.unshift({ lead: 'This post sits next to real business', point: txt('b:summary'), cites: ['b:summary'] });
+      }
+      const reply = {
+        summary: perf ? 'Your glow routine Reel is still early, and there is nothing to compare it with yet, so read these numbers on their own.' : 'A short beauty tutorial that walks through a holiday glow routine step by step.',
+        working: [...working, { lead: 'Your payoff is visible from the start', point: 'The finished look is clear and bright in the opening frame, which gives viewers a reason to stay.', cites: visual },
+                  ...(has('caption') ? [{ lead: 'Your caption sets up the save', point: 'The caption promises a simple routine and asks people to save it, which fits a tutorial.', cites: ['caption'] }] : [])],
+        improve,
+        recommendations: [{ point: 'Open on the finished glow and say the payoff out loud before the first step.', cites: visual }],
+        tests: [{ point: 'Start on a close-up of the finished skin instead of the title card.', cites: visual },
+                { point: 'Put the step count on screen in the opening frame.', cites: visual },
+                { point: 'Try a voiceover that names the problem first, then the fix.', cites: visual }],
+        next: [{ title: 'Glow routine, party edition', point: 'A follow-up that builds on the same routine for evening looks.', cites: visual },
+               { title: 'Before and after', point: 'Show the change side by side, since the result is the strongest visual here.', cites: visual },
+               { title: 'Product deep-dive', point: 'One product from the routine, up close, with how you use it.', cites: has('description') ? ['description'] : visual }],
+        business: has('category') ? { point: 'A clean, step-by-step beauty tutorial is the kind of piece a skincare brand can picture its product in; it works as a portfolio example in a pitch.', cites: ['category', ...visual] } : null,
+        limitations: []
+      };
+      res.writeHead(200, { 'content-type': 'application/json' });
+      return res.end(JSON.stringify({ content: [{ type: 'text', text: JSON.stringify(reply) }], usage: { input_tokens: 4200, output_tokens: 900 }, stop_reason: 'end_turn' }));
+    }
     if (String(system).startsWith('You read screenshots of social media analytics')) {
       // Stand-in for the vision model: confirms it was sent a real PNG, then returns what tests/e2e/fixtures/sample-insights.png shows.
       const img = (messages[0]?.content ?? []).find(b => b.type === 'image');

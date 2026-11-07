@@ -94,6 +94,85 @@ test.describe.serial('content intelligence', () => {
     await expect(page.getByRole('cell', { name: '2,599' })).toBeVisible();          // the 24-hour check-in is still there
     await expect(page.getByText('Entered by you').first()).toBeVisible();
 
+    // Creative review: grounded in the frames and text; an ungrounded claim from the model is removed, and says so.
+    await page.getByRole('button', { name: 'Run creative review' }).click();
+    await page.waitForURL(/\/analysis\/[0-9a-f-]{36}$/, { timeout: 60000 });
+    const reviewUrl = page.url();
+    await expect(page.getByRole('heading', { name: 'Creative review', level: 1 })).toBeVisible();
+    await expect(page.getByText('What’s working')).toBeVisible();
+    await expect(page.getByText('Based on: Frame at 0.5s').first()).toBeVisible();
+    await expect(page.getByText('300% more reach')).toHaveCount(0);
+    await page.getByText('Data limitations').click();
+    await expect(page.getByText('1 statement was left out because it couldn’t be checked against what you provided.')).toBeVisible();
+    await expect(page.getByText(/still frames \(0.5s, 1.5s, 3s/)).toBeVisible();
+    await page.getByRole('button', { name: 'Save analysis' }).click();
+    await expect(page.getByRole('button', { name: 'Saved ✓' })).toBeVisible();
+
+    // Follow-up conversation: answers are checked; suggestions can be saved as ideas or tasks, only on click.
+    await page.getByRole('button', { name: 'Give me three stronger hooks' }).click();
+    await expect(page.getByText('Here are three openings that put the result first.')).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText('70% better retention')).toHaveCount(0);                    // unsupported number removed
+    await expect(page.getByText(/part was left out/)).toBeVisible();
+    await page.getByRole('button', { name: 'Save as idea' }).first().click();
+    await expect(page.getByText('Saved as idea')).toBeVisible();
+    await page.getByRole('button', { name: 'Save as task' }).first().click();
+    await expect(page.getByText('Added to tasks')).toBeVisible();
+    await page.reload();                                                                      // the conversation is kept
+    await expect(page.getByText('Here are three openings that put the result first.')).toBeVisible();
+
+    // Same inputs again: the saved analysis is reused, no new AI call.
+    await page.getByRole('link', { name: /Holiday glow in 3 steps/ }).click();
+    await page.getByRole('button', { name: 'Run creative review' }).click();
+    await page.waitForURL(reviewUrl);
+    await expect(page.getByText('Nothing has changed since the last analysis').first()).toBeVisible();
+
+    // Performance check-in with no comparable history: the numbers, and a plain statement that there's nothing to compare yet.
+    await page.getByRole('link', { name: /Holiday glow in 3 steps/ }).click();
+    await page.getByLabel('Numbers to analyze').selectOption({ label: /24 hours/ } as any).catch(async () => {
+      const opt = await page.getByLabel('Numbers to analyze').locator('option', { hasText: '24 hours' }).getAttribute('value'); await page.getByLabel('Numbers to analyze').selectOption(opt!); });
+    await page.getByRole('button', { name: 'Run check-in' }).click();
+    await page.waitForURL(/\/analysis\/[0-9a-f-]{36}$/, { timeout: 60000 });
+    await expect(page.getByRole('heading', { name: '24-hour check-in', level: 1 })).toBeVisible();
+    await expect(page.getByText('Not enough historical content has been added to calculate a reliable comparison yet.').first()).toBeVisible();
+    await expect(page.getByText('2,599').first()).toBeVisible();
+    await expect(page.getByText('What needs attention')).toBeVisible();
+    await page.getByLabel('Ask about this analysis').fill('Why do you think people skipped this video?');
+    await page.getByRole('button', { name: 'Send question' }).click();
+    await expect(page.getByText(/A skip rate of 41.8% means a good share of viewers left early/)).toBeVisible({ timeout: 30000 });
+
+    // Business impact: link an existing partnership. Agreed fees and money received stay separate; nothing is claimed as caused.
+    await page.goto('/partnerships');
+    await page.getByRole('button', { name: 'New partnership' }).first().click();
+    await page.getByLabel('Brand', { exact: false }).first().fill('Lumen Skincare');
+    await page.getByLabel('Fee ($)', { exact: false }).first().fill('3200');
+    await page.getByLabel('Stage').selectOption('contracted');
+    await page.getByRole('button', { name: 'Add partnership' }).click();
+    await expect(page.getByText('Lumen Skincare').first()).toBeVisible();
+    await page.goto(itemUrl);
+    await page.getByLabel('Link to a partnership or income').selectOption({ label: 'Lumen Skincare · $3,200' });
+    await page.getByRole('button', { name: 'Link', exact: true }).click();
+    await expect(page.getByRole('link', { name: 'Lumen Skincare' })).toBeVisible();
+    await expect(page.getByText('Agreed fees (contracted)')).toBeVisible();
+    await expect(page.getByText('$3,200').first()).toBeVisible();
+    await expect(page.getByText('Received so far')).toBeVisible();
+    await page.getByRole('button', { name: 'Run business impact' }).click();
+    await page.waitForURL(/\/analysis\/[0-9a-f-]{36}$/, { timeout: 60000 });
+    await expect(page.getByRole('heading', { name: 'Business impact', level: 1 })).toBeVisible();
+    await expect(page.getByText('$3,200 in agreed fees (contracted, not all received)')).toBeVisible();
+    await expect(page.getByText('$0 received so far')).toBeVisible();
+    await page.getByText('Data limitations').click();
+    await expect(page.getByText(/not that it caused those deals or sales/)).toBeVisible();
+
+    // Coming back later: the saved analysis is listed on the item.
+    await page.goto('/content-intelligence');
+    await page.getByRole('link', { name: /Holiday glow in 3 steps/ }).first().click();
+    await expect(page.getByText('Past analyses')).toBeVisible();
+    await expect(page.getByRole('link', { name: /Creative review.*Saved/ })).toBeVisible();
+    await expect(page.getByText('Saved ideas')).toBeVisible();
+    await expect(page.getByText('Open on the finished glow, then: “This takes 3 steps.”')).toBeVisible();
+    await page.goto('/tasks');
+    await expect(page.getByText('“Your skin, but holiday-party ready.” Close-up first, title second.').first()).toBeVisible();
+
     await page.goto('/content-intelligence');
     await expect(page.getByText('Holiday glow in 3 steps')).toBeVisible();
     await expect(page.getByText('9,120 views · 7 days').first()).toBeVisible();      // latest measurement on the card

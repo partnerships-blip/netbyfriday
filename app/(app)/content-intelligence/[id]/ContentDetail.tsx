@@ -3,7 +3,7 @@
 // period), and insight screenshots. Analyses and business links build on this page in later milestones.
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Btn, Card, Eyebrow, Pill } from '@/components/ui';
+import { Btn, Card, Eyebrow, Pill, cx } from '@/components/ui';
 import { FormModal } from '@/components/FormModal';
 import { toast } from '@/components/Toaster';
 import { createClient } from '@/lib/supabase/client';
@@ -12,19 +12,34 @@ import { PLATFORM_LABEL, FORMAT_LABEL, PERIOD_LABEL, METRICS, checkUpload, LIMIT
 import { contentFields, deriveFromLink, snapshotFields, emptySnapshot } from '@/lib/content/fields';
 import { sampleFrames, videoDuration } from '@/lib/content/frames';
 import type { Asset, ContentItem, Snapshot } from '@/lib/content/server';
-import { updateContent, deleteContent, addSnapshot, deleteSnapshot, prepareUpload, confirmUpload, deleteAsset, extractInsights } from '../actions';
+import { updateContent, deleteContent, addSnapshot, deleteSnapshot, prepareUpload, confirmUpload, deleteAsset, extractInsights, analyzeContent, setIdeaDone, linkContent, unlinkContent } from '../actions';
+import Link from 'next/link';
 import { InsightReview } from './InsightReview';
 import type { Extraction } from '@/lib/content/extract';
+import type { Impact } from '@/lib/content/business';
+import { formatCents } from '@/lib/finance/core.js';
 
 type Lim = { videoMb: number; imageMb: number; videoSeconds: number; frames: number; insights: number };
 const fmtMetric = (k: string, v: number | null) => v == null ? '—' : k === 'skipRate' || k === 'retentionPct' ? `${v}%` : k === 'avgWatchSeconds' ? `${v}s` : v.toLocaleString('en-US');
 
-export function ContentDetail({ item, assets, snapshots, today, readOnly, limits }: { item: ContentItem; assets: Asset[]; snapshots: Snapshot[]; today: string; readOnly: boolean; limits: Lim }) {
+type ReportLite = { id: string; mode: string; title: string; savedAt: string | null; createdAt: string };
+type Opt = { id: string; label: string };
+export function ContentDetail({ item, assets, snapshots, reports, ideas, impact, dealOptions, incomeOptions, today, readOnly, limits }: { item: ContentItem; assets: Asset[]; snapshots: Snapshot[]; reports: ReportLite[]; ideas: { id: string; text: string; done: boolean }[]; impact: Impact; dealOptions: Opt[]; incomeOptions: Opt[]; today: string; readOnly: boolean; limits: Lim }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState('');
   const [review, setReview] = useState<{ assetId: string; extraction: Extraction } | null>(null);
+  const [snapPick, setSnapPick] = useState('');
+  const [linkPick, setLinkPick] = useState('');
+  async function analyze(mode: 'creative' | 'performance' | 'business') {
+    setBusy(mode === 'creative' ? 'Reviewing your content… this takes about 20 seconds' : mode === 'business' ? 'Looking at what this post is linked to… this takes about 20 seconds' : 'Comparing and analyzing your numbers… this takes about 20 seconds');
+    const r = await analyzeContent({ contentId: item.id, mode, snapshotId: mode === 'performance' && snapPick ? snapPick : undefined });
+    setBusy('');
+    if (!r.ok) return toast(r.error);
+    if (r.cached && r.message) toast(r.message);
+    router.push(`/content-intelligence/${item.id}/analysis/${r.reportId}`);
+  }
   const mediaInput = useRef<HTMLInputElement>(null), shotInput = useRef<HTMLInputElement>(null);
   const media = assets.find(a => a.kind === 'media');
   const frames = assets.filter(a => a.kind === 'frame');
@@ -167,6 +182,71 @@ export function ContentDetail({ item, assets, snapshots, today, readOnly, limits
         initial={{ url: item.url, title: item.title, platform: item.platform, format: item.format, publishedOn: item.publishedOn ?? '', category: item.category, goal: item.goal, caption: item.caption, description: item.description, transcript: item.transcript }}
         action={async v => { const r = await updateContent({ ...v, id: item.id }); if (r.ok) router.refresh(); return r; }}
         deleteLabel="Delete this content" onDelete={async () => { const r = await deleteContent(item.id); if (r.ok) router.push('/content-intelligence'); return r; }} />
+      <Card className="flex min-w-0 flex-col gap-3 p-5">
+        <div className="flex flex-wrap items-center justify-between gap-2"><Eyebrow>Business impact</Eyebrow><span className="text-[12px] text-muted">Linked by you. A link isn’t proof the post caused it.</span></div>
+        {impact.deals.length + impact.income.length > 0 ? <>
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+            <div className="rounded-[14px] bg-soft2 p-3.5"><div className="text-[12px] font-semibold text-muted">Linked partnerships</div><div className="font-head text-[26px] leading-none">{impact.deals.length}</div></div>
+            <div className="rounded-[14px] bg-soft2 p-3.5"><div className="text-[12px] font-semibold text-muted">Agreed fees (contracted)</div><div className="font-head text-[26px] leading-none tnum">{formatCents(impact.contractedCents)}</div>{impact.estimatedCents > 0 && <div className="mt-1 text-[11px] text-muted">+ {formatCents(impact.estimatedCents)} in estimates, not counted</div>}</div>
+            <div className="rounded-[14px] bg-[#EEF5EF] p-3.5"><div className="text-[12px] font-semibold text-muted">Received so far</div><div className="font-head text-[26px] leading-none tnum">{formatCents(impact.receivedCents)}</div><div className="mt-1 text-[11px] text-muted">Payments and income you recorded</div></div>
+          </div>
+          <ul className="flex flex-col">{[...impact.deals.map(d => ({ id: d.linkId, href: `/partnerships?deal=${d.dealId}`, label: d.label, sub: `${d.feeIsEstimate ? 'Estimate' : 'Agreed'} ${formatCents(d.feeCents)} · received ${formatCents(d.receivedCents)}` })),
+              ...impact.income.map(e => ({ id: e.linkId, href: '/money', label: e.label, sub: `${formatCents(e.amountCents)} received ${shortDate(e.receivedOn)}` }))].map(l => (
+            <li key={l.id} className="flex items-center justify-between gap-3 border-t border-line py-2.5 text-[14px]">
+              <span className="min-w-0"><Link href={l.href} className="font-semibold underline-offset-2 hover:underline">{l.label}</Link><span className="block text-[12px] text-muted">{l.sub}</span></span>
+              {!readOnly && <button className="flex-none text-[12px] text-sub underline" aria-label={`Unlink ${l.label}`} onClick={async () => { const r = await unlinkContent(l.id); toast(r.ok ? r.message ?? '' : r.error); router.refresh(); }}>Unlink</button>}
+            </li>))}</ul>
+        </> : <p className="text-[14px] text-sub">Did this post bring in a brand inquiry, a deal, or affiliate sales? Link it to the partnership or income you’ve recorded, and see what your content is associated with over time.</p>}
+        {!readOnly && (dealOptions.length > 0 || incomeOptions.length > 0) && <div className="flex flex-wrap items-center gap-2">
+          <select aria-label="Link to a partnership or income" value={linkPick} onChange={e => setLinkPick(e.target.value)} className="h-9 min-w-0 max-w-full flex-1 rounded-[10px] border border-line2 bg-white px-2 text-[13px] sm:max-w-[420px]">
+            <option value="">Choose a partnership or income…</option>
+            {dealOptions.length > 0 && <optgroup label="Partnerships">{dealOptions.map(o => <option key={o.id} value={'d:' + o.id}>{o.label}</option>)}</optgroup>}
+            {incomeOptions.length > 0 && <optgroup label="Income">{incomeOptions.map(o => <option key={o.id} value={'i:' + o.id}>{o.label}</option>)}</optgroup>}
+          </select>
+          <Btn disabled={!linkPick || !!busy} onClick={async () => { const [k, id] = linkPick.split(':'); const r = await linkContent({ contentId: item.id, ...(k === 'd' ? { dealId: id } : { incomeId: id }) }); toast(r.ok ? r.message ?? '' : r.error); if (r.ok) { setLinkPick(''); router.refresh(); } }}>Link</Btn>
+        </div>}
+        {!readOnly && !dealOptions.length && !incomeOptions.length && impact.deals.length + impact.income.length === 0 && <p className="text-[13px] text-muted">Add a partnership or income first, then link it here.</p>}
+      </Card>
+
+      <Card className="flex min-w-0 flex-col gap-4 p-5">
+        <Eyebrow>Analyze</Eyebrow>
+        <div className="grid gap-3 md:grid-cols-3">
+          <div className="flex flex-col gap-2 rounded-[14px] border border-line p-4">
+            <span className="text-[16px] font-bold">Creative review</span>
+            <span className="text-[13px] leading-snug text-sub">Hook, opening, pacing, storytelling, on-screen text, call to action. Based on the frames, image and text you added. No performance claims.</span>
+            {!readOnly && <Btn variant="primary" className="mt-auto w-fit" disabled={!!busy || (!frames.length && !media && !item.caption && !item.description && !item.transcript)} onClick={() => analyze('creative')}>Run creative review</Btn>}
+          </div>
+          <div className="flex flex-col gap-2 rounded-[14px] border border-line p-4">
+            <span className="text-[16px] font-bold">Performance check-in</span>
+            <span className="text-[13px] leading-snug text-sub">What your numbers show, compared with your other {FORMAT_LABEL[item.format]}s on {PLATFORM_LABEL[item.platform]} over the same period, when you have enough of them.</span>
+            {snapshots.length > 1 && <select aria-label="Numbers to analyze" className="h-9 rounded-[10px] border border-line2 bg-white px-2 text-[13px]" value={snapPick} onChange={e => setSnapPick(e.target.value)}>
+              <option value="">Latest: {PERIOD_LABEL[snapshots[0].period]} · {shortDate(snapshots[0].measuredOn)}</option>
+              {snapshots.slice(1).map(s => <option key={s.id} value={s.id}>{PERIOD_LABEL[s.period]} · {shortDate(s.measuredOn)}</option>)}</select>}
+            {!readOnly && <Btn variant="primary" className="mt-auto w-fit" disabled={!!busy || !snapshots.length} onClick={() => analyze('performance')}>{snapshots.length ? 'Run check-in' : 'Add numbers first'}</Btn>}
+          </div>
+          <div className="flex flex-col gap-2 rounded-[14px] border border-line p-4">
+            <span className="text-[16px] font-bold">Business impact</span>
+            <span className="text-[13px] leading-snug text-sub">What this post is linked to in your records, how to use it in pitches, and what to make more of. Agreed fees and money received are kept apart.</span>
+            {!readOnly && <Btn variant="primary" className="mt-auto w-fit" disabled={!!busy || impact.deals.length + impact.income.length === 0} onClick={() => analyze('business')}>{impact.deals.length + impact.income.length ? 'Run business impact' : 'Link a deal first'}</Btn>}
+          </div>
+        </div>
+        {reports.length > 0 && <div className="flex flex-col">
+          <div className="mb-1 text-[12px] font-semibold text-muted">Past analyses</div>
+          {reports.map(r => <Link key={r.id} href={`/content-intelligence/${item.id}/analysis/${r.id}`} className="flex items-center justify-between gap-3 border-t border-line py-2.5 text-[14px] hover:bg-soft2/50">
+            <span className="font-semibold">{r.title}</span>
+            <span className="flex flex-none items-center gap-2 text-[12px] text-muted">{r.savedAt && <Pill tone="ok">Saved</Pill>}{new Date(r.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ›</span></Link>)}
+        </div>}
+      </Card>
+
+      {ideas.length > 0 && <Card className="flex min-w-0 flex-col gap-2 p-5">
+        <Eyebrow>Saved ideas</Eyebrow>
+        <ul className="flex flex-col">{ideas.map(i => (
+          <li key={i.id} className="flex items-start gap-3 border-t border-line py-2.5 first:border-0">
+            <input type="checkbox" className="mt-1" aria-label={`Done: ${i.text}`} checked={i.done} disabled={readOnly} onChange={async e => { const r = await setIdeaDone(i.id, e.target.checked); if (!r.ok) toast(r.error); router.refresh(); }} />
+            <span className={cx('text-[15px] leading-relaxed', i.done && 'text-faint line-through')}>{i.text}</span>
+          </li>))}</ul>
+      </Card>}
+
       <InsightReview open={!!review} onClose={() => setReview(null)} extraction={review?.extraction ?? null} contentId={item.id} assetId={review?.assetId ?? ''} today={today}
         imageUrl={shots.find(x => x.id === review?.assetId)?.url} onSaved={() => router.refresh()} onManual={() => setAdding(true)} />
       <FormModal open={adding} onClose={() => setAdding(false)} title="Add metrics" submitLabel="Save metrics" fields={snapshotFields(today)} initial={emptySnapshot(today)}

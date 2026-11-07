@@ -10,10 +10,10 @@ performance over time, and get AI reviews grounded only in what they provided. B
 | 1. Content Library and database | Built: library (grid/table, search, platform filter, sort), item page, all tables with RLS |
 | 2. Secure upload, link and manual entry | Built: private bucket, signed one-time uploads, server-side size/type/signature checks, frames sampled in the browser, link detection, metrics history |
 | 3. Insight screenshot extraction and confirmation | Built: AI transcribes labels and value text; numbers parsed by our code; unclear values left empty and flagged; period must be confirmed; reading cached per screenshot |
-| 4. Creative Review and Performance Check-In | Planned |
-| 5. Follow-up conversation | Planned |
-| 6. Business Impact links | Tables ready (`content_links`); UI planned |
-| 7. Comparisons, Advisor access, optimisation | Planned |
+| 4. Creative Review and Performance Check-In | Built: grounded reports (every point cites its source; numbers must come from what it cites); like-with-like comparisons calculated in `lib/content/compare.ts`; identical inputs reuse the saved report |
+| 5. Follow-up conversation | Built: questions answered from the analysis, its sources and the creator's other content of the same kind; same number check; ideas can be saved as content ideas or tasks on click |
+| 6. Business Impact | Built: link posts to partnerships or income; agreed fees, estimates and money received kept apart; Business Impact analysis; category patterns |
+| 7. Advisor access, optimisation | Next. Advisor changes need the Advisor evaluation workflow run against staging (CLAUDE.md) |
 
 ## Turning it on
 
@@ -56,6 +56,25 @@ conversations and links.
 5. Confirming saves a new snapshot marked "From your screenshot", linked to the screenshot. The reading itself is cached
    on the screenshot, so opening the review again doesn't call the AI again.
 
+## Reports and grounding
+
+Each analysis is built from *sources*: frames (`frame:N` with their time), the image, caption, description, voiceover text,
+goal, category, length, calculated metric facts (`m:`), rates (`r:`), comparisons (`c:`), and linked business records (`b:`).
+The model must cite sources for every point; `lib/content/report.ts` (`verifyReport`) drops any point that cites nothing,
+cites something unknown, or states a number not found in what it cites. A creative review given no numbers may not talk
+about performance at all. Dropped statements are counted in the report's data limitations. The "what stands out" list,
+comparison cards and business totals are written by our code, not the model.
+
+Comparisons (`lib/content/compare.ts`): same platform, same format, same reporting period, latest measurement per post,
+median of at least 3 posts per metric; otherwise "Not enough historical content has been added to calculate a reliable
+comparison yet."
+
+Follow-ups (`lib/content/followup.ts`): the same number rule, sentence by sentence. Hooks, rewrites and plans come back
+as ideas, which may not contain statistics; the creator can save them as content ideas or tasks.
+
+Business impact (`lib/content/business.ts`): agreed fees (non-estimates, not lost) vs. money received (payments on the
+deal's invoices plus linked income). Links are the creator's records and are always described as associations.
+
 ## Limits (beta)
 
 | Setting (Vercel env, optional) | Default |
@@ -87,8 +106,10 @@ in `supabase/tests/database/rls_isolation.test.sql`.
 - Bandwidth: videos are served by signed URL; each view of the item page streams the video only if played.
 - AI, screenshot reading: one vision call per screenshot (about 1,500–2,000 input and ~300 output tokens; roughly 1–2¢ on
   a Sonnet-class model). Cached, counted in the hourly cap, tokens stored in `ai_usage`.
-- AI, later analyses: send frames (images) and text to the existing Anthropic provider;
-  each analysis is counted against the per-user hourly cap and its token use recorded.
+- AI, analyses: a creative review sends up to 8 frames plus text (roughly 5–7K input and 1–2K output tokens; about 3–5¢
+  on a Sonnet-class model). A check-in sends the 4 opening frames (about 2–4¢). Each follow-up sends 3 frames and the
+  context (about 2–3¢). Identical inputs reuse the saved report at no cost. Everything counts against the per-user
+  hourly cap and token use is stored in `ai_usage` (input_tokens / output_tokens).
 - Would materially increase costs (not built): automatic speech-to-text for voiceovers (needs a second AI vendor),
   server-side video processing, analysing every frame, or unlimited analyses.
 

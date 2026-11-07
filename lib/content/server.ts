@@ -67,18 +67,40 @@ export async function loadItem(c: Ctx, id: string) {
   const { data: item, error } = await c.sb.from('content_items').select('*').eq('workspace_id', c.ws.id).eq('id', id).maybeSingle();
   if (error) throw error;
   if (!item) return null;
-  const [assets, snaps] = await Promise.all([
+  const [assets, snaps, ideas] = await Promise.all([
     c.sb.from('content_assets').select('*').eq('content_id', id).order('kind').order('frame_at_seconds', { ascending: true, nullsFirst: true }).order('created_at'),
-    c.sb.from('content_snapshots').select('*').eq('content_id', id).order('measured_on', { ascending: false }).order('created_at', { ascending: false })
+    c.sb.from('content_snapshots').select('*').eq('content_id', id).order('measured_on', { ascending: false }).order('created_at', { ascending: false }),
+    c.sb.from('content_ideas').select('id,text,done,created_at').eq('content_id', id).order('created_at', { ascending: false })
   ]);
-  if (assets.error) throw assets.error; if (snaps.error) throw snaps.error;
+  if (assets.error) throw assets.error; if (snaps.error) throw snaps.error; if (ideas.error) throw ideas.error;
   const list: Asset[] = (assets.data ?? []).map(mapAsset);
   const urls = await signed(c, list.map(a => a.path));
-  return { item: mapItem(item), assets: list.map(a => ({ ...a, url: urls.get(a.path) })), snapshots: (snaps.data ?? []).map(mapSnapshot) };
+  return { item: mapItem(item), assets: list.map(a => ({ ...a, url: urls.get(a.path) })), snapshots: (snaps.data ?? []).map(mapSnapshot),
+    ideas: (ideas.data ?? []).map((x: any) => ({ id: x.id as string, text: x.text as string, done: !!x.done })) };
 }
 
 export async function workspaceBytes(c: Ctx): Promise<number> {
   const { data, error } = await c.sb.from('content_assets').select('bytes').eq('workspace_id', c.ws.id);
   if (error) throw error;
   return (data ?? []).reduce((s: number, r: any) => s + Number(r.bytes), 0);
+}
+
+export type ReportRow = { id: string; mode: 'creative' | 'performance' | 'business'; snapshotId: string | null; savedAt: string | null; createdAt: string; report: import('./report').Report };
+const mapReport = (r: any): ReportRow => ({ id: r.id, mode: r.mode, snapshotId: r.snapshot_id, savedAt: r.saved_at, createdAt: r.created_at, report: r.report });
+
+export async function loadReports(c: Ctx, contentId: string): Promise<ReportRow[]> {
+  const { data, error } = await c.sb.from('content_reports').select('*').eq('content_id', contentId).eq('workspace_id', c.ws.id).order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map(mapReport);
+}
+
+export async function loadReport(c: Ctx, contentId: string, reportId: string) {
+  const { data, error } = await c.sb.from('content_reports').select('*').eq('id', reportId).eq('content_id', contentId).eq('workspace_id', c.ws.id).maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  const item = await loadItem(c, contentId);
+  if (!item) return null;
+  const { data: msgs, error: me } = await c.sb.from('content_messages').select('id,role,text,created_at').eq('report_id', reportId).order('created_at');
+  if (me) throw me;
+  return { ...item, report: mapReport(data), messages: (msgs ?? []).map((m: any) => ({ id: m.id, role: m.role as 'user' | 'assistant', text: m.text, createdAt: m.created_at })) };
 }
