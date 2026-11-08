@@ -1,12 +1,12 @@
 // Turns the AI's proposal (from a message or screenshot) into editable agreement terms. Proposals only: the creator
 // reviews and edits every term before anything is signed or sent. Money is parsed by the finance engine.
-import { parseMoneyToCents } from '../finance/core.js';
+import { feeToCents } from '../ai/contracts';
 import type { ContractExtraction } from '../types';
 import { EMPTY_TERMS, type AgreementTerms } from './template';
 
 export function extractionToTerms(x: ContractExtraction | null, ctx: { creatorName: string; creatorEmail: string; deal?: { brandName: string; campaign: string; feeCents: number } | null }): AgreementTerms {
   const v = (k: keyof ContractExtraction['fields']) => (x?.fields[k]?.value ?? '').trim();
-  const feeCents = v('fee') ? parseMoneyToCents(v('fee').replace(/[^\d.,]/g, '')) : null;
+  const feeCents = v('fee') ? feeToCents(v('fee')) : null;
   const dealFee = ctx.deal && ctx.deal.feeCents > 0 ? ctx.deal.feeCents : null;
   const fee = feeCents ?? dealFee;
   const email = v('contactEmail');

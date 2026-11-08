@@ -40,6 +40,15 @@ const Raw = z.object({
   warnings: z.array(z.string()).default([])
 });
 
+const MONEY_RE = /\$\s?\d[\d,]*(?:\.\d+)?|\b\d{1,3}(?:,\d{3})+(?:\.\d+)?\b|\b\d+(?:\.\d{1,2})?\b/g;
+/** The fee in cents from wording like "$6,000 for 2 months": reads the first written amount only, never digits glued
+ *  together from the rest of the phrase. Prefers an amount with "$" or thousands commas over a bare number. */
+export function feeToCents(value: string): number | null {
+  const all = value.match(MONEY_RE) ?? [];
+  const pick = all.find(a => a.includes('$') || a.includes(',')) ?? all[0];
+  return pick ? parseMoneyToCents(pick.replace(/[$\s]/g, '')) : null;
+}
+
 /** Whitespace, curly quotes and case don't count as differences when matching a quote to the contract text. */
 export const normalize = (s: string) => s.toLowerCase().replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/[–—]/g, '-').replace(/\s+/g, ' ').trim();
 
@@ -60,7 +69,11 @@ export function parseExtraction(raw: string, source: 'pdf' | 'text' | 'image', s
     let value = f.data.value;
     if (k.endsWith('On') && !date.safeParse(value).success) { out.warnings.push(`Ignored an unclear date for ${label(k)}.`); continue; }
     if (k.endsWith('Days')) { const n = Number(value); if (!Number.isInteger(n) || n <= 0 || n > 3650) { out.warnings.push(`Ignored an unclear length for ${label(k)}.`); continue; } value = String(n); }
-    if (k === 'fee' && parseMoneyToCents(value.replace(/[^\d.,]/g, '')) === null) { out.warnings.push('The fee could not be read as an amount. Check it in the contract.'); continue; }
+    if (k === 'fee' && (value.match(/\$\s?\d[\d,]*(?:\.\d+)?|\b\d{1,3}(?:,\d{3})+(?:\.\d+)?\b/g) ?? []).length > 1) {
+      // Two or more amounts (e.g. "$3,000 for November and $3,000 for December") must never be glued into one number.
+      out.warnings.push(`The fee lists more than one amount (“${value.slice(0, 80)}”). Enter the total fee yourself.`); continue;
+    }
+    if (k === 'fee' && feeToCents(value) === null) { out.warnings.push('The fee could not be read as an amount. Check it in the contract.'); continue; }
     if (k === 'fee' && /\b(per|each|every|a|an)\s+(month|week|post|piece|asset|reel|story|video|deliverable)|\/\s*(mo|month|wk|week|post)\b|\b(monthly|weekly)\b/i.test(value)) { out.warnings.push(`The fee was written as a rate (“${value.slice(0, 80)}”), not a total. Enter the total fee yourself.`); continue; }
     const field: ExtractedField = { value, quote: f.data.quote, found: found(f.data.quote) };
     out.fields[k] = field;
@@ -82,7 +95,7 @@ export function parseExtraction(raw: string, source: 'pdf' | 'text' | 'image', s
 /** Initial values for the review form, computed from a proposal. End dates come from start + days when no end date was written. */
 export function proposalToForm(x: ContractExtraction | null) {
   const v = (k: Key) => x?.fields[k]?.value ?? '';
-  const feeCents = v('fee') ? parseMoneyToCents(v('fee').replace(/[^\d.,]/g, '')) : null;
+  const feeCents = v('fee') ? feeToCents(v('fee')) : null;
   const usageEnds = v('usageEndsOn') || (v('usageStartsOn') && v('usageDays') ? addDays(v('usageStartsOn'), Number(v('usageDays'))) : '');
   const exclEnds = v('exclusivityEndsOn') || (v('exclusivityStartsOn') && v('exclusivityDays') ? addDays(v('exclusivityStartsOn'), Number(v('exclusivityDays'))) : '');
   return {

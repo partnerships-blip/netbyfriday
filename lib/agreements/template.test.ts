@@ -90,3 +90,15 @@ describe('reading a long email thread', () => {
     expect(AGREEMENT_SYSTEM).toContain('latest version both sides accepted');
   });
 });
+
+describe('fees with more than one amount', () => {
+  it('never glues "$3,000 … and $3,000 …" into $30,003,000', async () => {
+    const { parseExtraction } = await import('../ai/contracts');
+    const x = parseExtraction(JSON.stringify({ fields: { fee: { value: '$3,000 for November and $3,000 for December', quote: '' } }, deliverables: [{ name: '1 Reel', quote: '' }] }), 'text', '');
+    expect(x.fields.fee).toBeUndefined();
+    expect(x.warnings.some(w => w.startsWith('The fee lists more than one amount'))).toBe(true);
+    const one = parseExtraction(JSON.stringify({ fields: { fee: { value: '$6,000 for 2 months', quote: '' } }, deliverables: [{ name: '1 Reel', quote: '' }] }), 'text', '');
+    expect(one.fields.fee?.value).toBe('$6,000 for 2 months');
+    expect(extractionToTerms(one, { creatorName: 'Poca', creatorEmail: '' }).fee).toBe('6000.00');
+  });
+});
