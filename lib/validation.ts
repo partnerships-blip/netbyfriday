@@ -98,6 +98,8 @@ export const TaskPatchSchema = TaskSchema.partial().extend({ id: uuid, status: z
 
 // ---------- contracts, taxes, invoice links ----------
 const optDateNull = z.union([z.literal(''), isoDate]).default('').transform(v => v || null);
+/** Link a contract to a partnership (dealId), or unlink it (dealId: null). */
+export const ContractLinkSchema = z.object({ contractId: uuid, dealId: z.union([uuid, z.null()]) });
 export const ContractSchema = z.object({
   id: uuid,
   confirm: z.boolean().default(false),

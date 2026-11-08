@@ -21,6 +21,16 @@ export async function POST(req: Request) {
     const { sb, ws, user } = await requireWritable();
     const form = await req.formData();
     const file = form.get('file'), pasted = String(form.get('text') ?? '').trim();
+    // Uploaded from a partnership: the contract starts linked to it, and review defaults to that partnership.
+    const dealIdRaw = String(form.get('dealId') ?? '').trim();
+    let deal: { id: string; brandName: string } | null = null;
+    if (dealIdRaw) {
+      if (!/^[0-9a-f-]{36}$/i.test(dealIdRaw)) throw new UserError('That partnership wasn’t found.');
+      const { data: d } = await sb.from('deals').select('id,brand_id').eq('id', dealIdRaw).eq('workspace_id', ws.id).maybeSingle();
+      if (!d) throw new UserError('That partnership wasn’t found.');
+      const { data: b } = d.brand_id ? await sb.from('brands').select('name').eq('id', d.brand_id).eq('workspace_id', ws.id).maybeSingle() : { data: null };
+      deal = { id: d.id, brandName: b?.name ?? '' };
+    }
     let pdfBase64: string | undefined, text: string | undefined, fileName = '', storagePath: string | null = null, fileNote = '';
 
     if (file instanceof File && file.size > 0) {
@@ -59,8 +69,8 @@ export async function POST(req: Request) {
     const f = proposalToForm(extraction);
     const nul = (s: string) => s || null;
     const { data, error } = await sb.from('contracts').insert({
-      workspace_id: ws.id, status: 'review', title: (f.title || fileName.replace(/\.(pdf|txt)$/i, '') || 'Pasted contract').slice(0, 200), file_name: fileName, storage_path: storagePath,
-      extracted: extraction, brand_name: f.brandName.slice(0, 160), fee_cents: f.fee ? parseMoneyToCents(f.fee) : null, payment_terms: f.paymentTerms.slice(0, 200), signed_on: nul(f.signedOn),
+      workspace_id: ws.id, deal_id: deal?.id ?? null, status: 'review', title: (f.title || fileName.replace(/\.(pdf|txt)$/i, '') || 'Pasted contract').slice(0, 200), file_name: fileName, storage_path: storagePath,
+      extracted: extraction, brand_name: (f.brandName || deal?.brandName || '').slice(0, 160), fee_cents: f.fee ? parseMoneyToCents(f.fee) : null, payment_terms: f.paymentTerms.slice(0, 200), signed_on: nul(f.signedOn),
       usage_rights: f.usageRights.slice(0, 1000), usage_starts_on: nul(f.usageStartsOn), usage_ends_on: nul(f.usageEndsOn),
       exclusivity: f.exclusivity.slice(0, 1000), exclusivity_starts_on: nul(f.exclusivityStartsOn), exclusivity_ends_on: nul(f.exclusivityEndsOn),
       whitelisting: f.whitelisting.slice(0, 500), revisions: f.revisions.slice(0, 500), kill_fee: f.killFee.slice(0, 500), other_terms: f.otherTerms.slice(0, 5000)

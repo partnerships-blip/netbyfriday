@@ -1,6 +1,6 @@
 'use client';
 import { flag } from '@/lib/flags';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Drawer } from '@/components/Modal';
 import { Btn, Eyebrow, Input, Select, Textarea, Pill, cx } from '@/components/ui';
@@ -9,10 +9,10 @@ import { DraftModal, type DraftTarget } from '@/components/DraftModal';
 import { dealFields, deliverableFields } from '@/components/forms';
 import { DEAL_TYPE_LABEL, SCHEDULE_LABEL, TRIGGER_LABEL } from '@/lib/deals';
 import { useAction, toast } from '@/components/Toaster';
-import { addDeliverable, updateDeliverable, deleteDeliverable, updateDeal, deleteDeal } from '@/app/(app)/actions';
+import { addDeliverable, updateDeliverable, deleteDeliverable, updateDeal, deleteDeal, linkContract } from '@/app/(app)/actions';
 import { STAGES, formatCents, shortDate, dealOutstanding } from '@/lib/finance/core.js';
 import { DELIVERABLE_LABEL } from '@/lib/brand';
-import type { Contact, Deal, Deliverable, Stage, Task } from '@/lib/types';
+import type { Contact, Contract, Deal, Deliverable, Stage, Task } from '@/lib/types';
 import Link from 'next/link';
 import { TaskList } from '@/components/TaskList';
 import type { InvoiceLite } from './Board';
@@ -20,7 +20,7 @@ import type { InvoiceLite } from './Board';
 const DTONE: Record<string, any> = { not_started: 'neutral', in_progress: 'accent', in_review: 'warn', approved: 'ok', posted: 'ok', scheduled: 'neutral' };
 const DRAFTS = ['Following up on an unanswered proposal', 'Requesting a contract', 'Following up on payment', 'Reconnecting with a previous partner', 'Proposing a new campaign'];
 
-export function DealDrawer({ deal, allDeals, contacts = [], tasks = [], invoices, received, onClose, onMove, onSettle, readOnly, today }: { onSettle?: (id: string) => void; deal: Deal | null; allDeals: Deal[]; contacts?: Contact[]; tasks?: Task[]; invoices: InvoiceLite[]; received: Record<string, number>; onClose: () => void; onMove: (id: string, s: Stage) => void; readOnly: boolean; today: string }) {
+export function DealDrawer({ deal, allDeals, contacts = [], tasks = [], contracts = [], invoices, received, onClose, onMove, onSettle, readOnly, today }: { onSettle?: (id: string) => void; deal: Deal | null; allDeals: Deal[]; contacts?: Contact[]; tasks?: Task[]; contracts?: Contract[]; invoices: InvoiceLite[]; received: Record<string, number>; onClose: () => void; onMove: (id: string, s: Stage) => void; readOnly: boolean; today: string }) {
   const router = useRouter();
   const [pending, run] = useAction();
   const [editing, setEditing] = useState(false);
@@ -66,6 +66,8 @@ export function DealDrawer({ deal, allDeals, contacts = [], tasks = [], invoices
         <dl className="grid grid-cols-1 gap-px overflow-hidden rounded-xl border border-soft bg-soft sm:grid-cols-2">
           {facts.map(([k, v]) => <div key={k} className="flex flex-col gap-0.5 bg-white px-3 py-2.5"><dt className="text-[11px] text-muted">{k}</dt><dd className="break-words text-sm leading-snug">{v || '—'}</dd></div>)}
         </dl>
+
+        {flag('contracts') && <ContractsPanel deal={deal} contracts={contracts} readOnly={readOnly} onChange={refresh} />}
 
         <section className="flex flex-col gap-2">
           <Eyebrow>Deliverables</Eyebrow>
@@ -168,6 +170,59 @@ function Attachments({ dealId, files, readOnly, onChange }: { dealId: string; fi
       </div>
       {!readOnly && <label className={cx('inline-flex h-9 w-fit cursor-pointer items-center rounded-[10px] border border-line2 px-3.5 text-[13px]', busy && 'opacity-50')}>{busy ? 'Uploading…' : 'Attach a file'}<input type="file" className="hidden" accept=".pdf,.png,.jpg,.jpeg,.webp,.docx,.txt,.csv" onChange={e => upload(e.target.files?.[0])} /></label>}
       <p className="text-xs text-muted">PDF, image, Word, text or CSV up to 10 MB. Stored privately. Contents are not read by the AI in this beta.</p>
+    </section>
+  );
+}
+
+/** Contracts on this partnership: see them, upload a new one (it starts linked here), or link one already uploaded. */
+function ContractsPanel({ deal, contracts, readOnly, onChange }: { deal: Deal; contracts: Contract[]; readOnly: boolean; onChange: () => void }) {
+  const router = useRouter();
+  const [pending, run] = useAction();
+  const [busy, setBusy] = useState(false);
+  const [pick, setPick] = useState('');
+  const input = useRef<HTMLInputElement>(null);
+  const linked = contracts.filter(c => c.dealId === deal.id);
+  const unlinked = contracts.filter(c => !c.dealId);
+  const upload = async (f?: File) => {
+    if (!f) return;
+    if (readOnly) return toast('Demo mode is read-only.');
+    if (f.size > 10 * 1024 * 1024) return toast('Contracts must be under 10 MB.', 'error');
+    setBusy(true);
+    const fd = new FormData(); fd.set('file', f); fd.set('dealId', deal.id);
+    try {
+      const res = await fetch('/api/contracts', { method: 'POST', body: fd });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || !j.id) throw new Error(j.error || 'Upload failed.');
+      router.push(`/contracts/${j.id}`);
+    } catch (e) { toast((e as Error).message, 'error'); setBusy(false); if (input.current) input.current.value = ''; }
+  };
+  return (
+    <section className="flex flex-col gap-2" aria-label="Contracts">
+      <Eyebrow>Contracts</Eyebrow>
+      {linked.map(c => (
+        <div key={c.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-line px-3 py-2.5">
+          <Link href={`/contracts/${c.id}`} className="min-w-0 flex-1 hover:underline">
+            <span className="block truncate text-sm font-semibold">{c.title}</span>
+            <span className="block text-xs text-muted">{[c.feeCents !== null ? formatCents(c.feeCents) : '', c.usageEndsOn ? `Usage until ${shortDate(c.usageEndsOn)}` : '', c.exclusivityEndsOn ? `Exclusivity until ${shortDate(c.exclusivityEndsOn)}` : ''].filter(Boolean).join(' · ') || (c.status === 'review' ? 'Terms are waiting for your review' : 'No dates on this contract')}</span>
+          </Link>
+          {c.status === 'review' ? <Link href={`/contracts/${c.id}`}><Pill tone="warn">Needs review</Pill></Link> : <Pill tone="ok">Confirmed</Pill>}
+          {c.hasFile && <a href={`/api/contracts/${c.id}/file`} target="_blank" rel="noopener" className="text-xs text-muted hover:text-ink">View file</a>}
+          {!readOnly && <button className="text-xs text-muted hover:text-danger" aria-label={`Unlink ${c.title}`} disabled={pending} onClick={() => run(() => linkContract({ contractId: c.id, dealId: null }), onChange)}>Unlink</button>}
+        </div>))}
+      {!linked.length && <p className="text-sm text-muted">No contract linked yet. Upload the agreement and netbyfriday reads the terms for you to check.</p>}
+      {!readOnly && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Btn size="sm" variant="primary" disabled={busy} onClick={() => input.current?.click()}>{busy ? 'Reading contract…' : 'Upload contract'}</Btn>
+          <input ref={input} type="file" accept="application/pdf,text/plain" className="hidden" aria-label="Contract file" onChange={e => upload(e.target.files?.[0])} />
+          {unlinked.length > 0 && <>
+            <Select aria-label="Existing contract" value={pick} onChange={e => setPick(e.target.value)} className="h-9 w-auto max-w-full">
+              <option value="">Link an existing contract…</option>
+              {unlinked.map(c => <option key={c.id} value={c.id}>{c.title}{c.brandName ? ` · ${c.brandName}` : ''}{c.status === 'review' ? ' (needs review)' : ''}</option>)}
+            </Select>
+            <Btn size="sm" disabled={!pick || pending} onClick={() => run(() => linkContract({ contractId: pick, dealId: deal.id }), () => { setPick(''); onChange(); })}>Link</Btn>
+          </>}
+        </div>)}
+      {!readOnly && <p className="text-xs leading-relaxed text-muted">PDF up to 10 MB. You check every term before it’s saved to this partnership. Linking a confirmed contract fills in any empty terms here; it never changes the fee or your money records.</p>}
     </section>
   );
 }

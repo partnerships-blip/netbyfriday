@@ -57,6 +57,42 @@ test.describe.serial('contracts, taxes and invoice links', () => {
     await expect(page.getByText('Marigold Holiday Glow').first()).toBeVisible();
   });
 
+  test('partnership drawer: see linked contracts, unlink and relink, upload one that starts linked', async ({ page }) => {
+    await page.goto('/login');
+    await page.getByLabel('Email').fill(U.email); await page.getByLabel('Password').fill(U.password);
+    await page.getByRole('button', { name: 'Sign in' }).click(); await page.waitForURL('**/overview');
+    test.skip((await page.goto('/contracts'))?.status() === 404, 'contracts flag is off on this deployment');
+
+    // The contract confirmed in the first test is linked to its partnership and shows in the drawer.
+    await page.goto('/partnerships');
+    await page.getByRole('button', { name: /Marigold Holiday Glow/ }).first().click();
+    const panel = page.getByRole('region', { name: 'Contracts' });
+    await expect(panel.getByText('Marigold Holiday Glow')).toBeVisible();
+    await expect(panel.getByText('Confirmed', { exact: true })).toBeVisible();
+    await expect(panel.getByText(/Usage until Feb 18/)).toBeVisible();
+
+    // Unlink, then link it back from the drawer.
+    await panel.getByRole('button', { name: 'Unlink Marigold Holiday Glow' }).click();
+    await expect(panel.getByText('No contract linked yet.', { exact: false })).toBeVisible();
+    await panel.getByLabel('Existing contract').selectOption({ label: 'Marigold Holiday Glow · Marigold Beauty Co.' });
+    await panel.getByRole('button', { name: 'Link', exact: true }).click();
+    await expect(panel.getByText('Confirmed', { exact: true })).toBeVisible();
+
+    // Upload from the drawer: the new contract opens for review, already pointed at this partnership.
+    await panel.getByLabel('Contract file').setInputFiles({ name: 'marigold-renewal.txt', mimeType: 'text/plain', buffer: Buffer.from(CONTRACT) });
+    await page.waitForURL(/\/contracts\/[0-9a-f-]{36}$/);
+    await expect(page.getByLabel('Choose partnership')).toHaveValue(/[0-9a-f-]{36}/);
+    await expect(page.getByLabel('Choose partnership').locator('option:checked')).toHaveText(/Marigold Beauty Co\. – Marigold Holiday Glow/);
+
+    // Back on the partnership it shows as waiting for review, and the table has a Contract column.
+    await page.goto('/partnerships');
+    await page.getByRole('button', { name: /Marigold Holiday Glow/ }).first().click();
+    await expect(page.getByRole('region', { name: 'Contracts' }).getByText('Needs review', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Close' }).click();
+    await page.getByRole('tab', { name: 'Table' }).or(page.getByRole('button', { name: 'Table', exact: true })).first().click();
+    await expect(page.getByRole('columnheader', { name: 'Contract' })).toBeVisible();
+  });
+
   test('taxes: cash-basis totals and a saved set-aside rate', async ({ page }) => {
     await page.goto('/login');
     await page.getByLabel('Email').fill(U.email); await page.getByLabel('Password').fill(U.password);

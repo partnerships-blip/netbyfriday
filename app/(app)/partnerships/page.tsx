@@ -1,6 +1,7 @@
 import { loadApp } from '@/lib/data/load';
 import { PageHeader, ReadOnlyNote } from '@/components/ui';
 import { formatCents } from '@/lib/finance/core.js';
+import { flag } from '@/lib/flags';
 import { Board } from './Board';
 
 export default async function PartnershipsPage({ searchParams }: { searchParams: { deal?: string } }) {
@@ -13,7 +14,7 @@ export default async function PartnershipsPage({ searchParams }: { searchParams:
     <>
       <PageHeader title="Partnerships" sub="Every brand deal from first inquiry to final payment." />
       <ReadOnlyNote show={app.readOnly} />
-      <Board deals={deals} invoices={invoices} received={m.receivedByDeal} summary={summary} initialDeal={searchParams.deal ?? null} readOnly={app.readOnly} today={m.today} contacts={app.input.contacts ?? []} tasks={app.input.tasks ?? []} />
+      <Board deals={deals} invoices={invoices} received={m.receivedByDeal} summary={summary} initialDeal={searchParams.deal ?? null} readOnly={app.readOnly} today={m.today} contacts={app.input.contacts ?? []} tasks={app.input.tasks ?? []} contracts={flag('contracts') ? app.contracts ?? [] : []} />
     </>
   );
 }

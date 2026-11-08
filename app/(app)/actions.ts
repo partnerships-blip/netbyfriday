@@ -426,6 +426,30 @@ export async function saveContract(raw: unknown) {
     return v.id;
   }, 'Contract saved');
 }
+// Connect a contract to a partnership from either side. Linking a confirmed contract fills in only the terms the partnership
+// doesn't have yet (contract status, usage, exclusivity, payment terms). It never overwrites them, and never touches the
+// fee, invoices, payments or revenue.
+export async function linkContract(raw: unknown) {
+  const linking = !!(raw as { dealId?: unknown } | null)?.dealId;
+  return run(async c => {
+    if (!flag('contracts')) throw new UserError('Contracts are not available yet.');
+    const v = S.ContractLinkSchema.parse(raw);
+    const cur = ok(await c.sb.from('contracts').select('id,status,payment_terms,usage_rights,exclusivity').eq('id', v.contractId).eq('workspace_id', c.ws.id).single());
+    if (v.dealId) {
+      const deal = ok(await c.sb.from('deals').select('id,contract_status,usage_rights,exclusivity,payment_terms').eq('id', v.dealId).eq('workspace_id', c.ws.id).single());
+      if (cur.status === 'confirmed') {
+        const patch: Record<string, string> = {};
+        if (!deal.contract_status) patch.contract_status = 'Signed';
+        if (!deal.usage_rights && cur.usage_rights) patch.usage_rights = cur.usage_rights.slice(0, 500);
+        if (!deal.exclusivity && cur.exclusivity) patch.exclusivity = cur.exclusivity.slice(0, 500);
+        if (!deal.payment_terms && cur.payment_terms) patch.payment_terms = cur.payment_terms.slice(0, 200);
+        if (Object.keys(patch).length) ok(await c.sb.from('deals').update(patch).eq('id', deal.id).eq('workspace_id', c.ws.id).select('id').single());
+      }
+    }
+    ok(await c.sb.from('contracts').update({ deal_id: v.dealId }).eq('id', v.contractId).eq('workspace_id', c.ws.id).select('id').single());
+    return v.contractId;
+  }, linking ? 'Contract linked' : 'Contract unlinked');
+}
 export async function deleteContract(id: string) {
   return run(async c => {
     if (!flag('contracts')) throw new UserError('Contracts are not available yet.');
