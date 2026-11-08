@@ -2,11 +2,12 @@
 // All mutations. Each one: authenticate → refuse in demo mode → validate with zod → write under RLS → revalidate.
 // workspace_id is always taken from the server session, never from the client.
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { cookies, headers } from 'next/headers';
 import { createHash, randomUUID } from 'node:crypto';
 import { agreementsAllowed } from '@/lib/agreements/access';
 import { renderAgreement, agreementText, agreementTitle, missingRequired } from '@/lib/agreements/template';
-import { requireWritable, requireWorkspace, friendlyError, todayIn, UserError } from '@/lib/auth';
+import { requireWritable, requireWorkspace, friendlyError, todayIn, UserError, isDemo } from '@/lib/auth';
 import * as S from '@/lib/validation';
 import { track } from '@/lib/analytics';
 import { ensureBrand } from '@/lib/data/brands';
@@ -370,6 +371,47 @@ export async function setDemoMode(on: boolean) {
   else cookies().delete('ci_demo');
   revalidatePath('/', 'layout');
   return { ok: true } as ActionResult;
+}
+
+// ---------- delete my account ----------
+// Removes stored files (under the user's own storage policies), then the workspace, every record, the waitlist entry and
+// the login, through delete_my_account(), which checks the typed email again in the database. Can't be undone.
+async function listFiles(sb: any, bucket: string, prefix: string, depth = 0): Promise<string[]> {
+  const out: string[] = [];
+  for (let offset = 0; ; offset += 1000) {
+    const { data, error } = await sb.storage.from(bucket).list(prefix, { limit: 1000, offset });
+    if (error || !data?.length) break;
+    for (const f of data) {
+      const path = `${prefix}/${f.name}`;
+      if (f.id) out.push(path);
+      else if (depth < 4) out.push(...await listFiles(sb, bucket, path, depth + 1));   // folders have no id
+    }
+    if (data.length < 1000) break;
+  }
+  return out;
+}
+
+export async function deleteMyAccount(confirmEmail: string): Promise<ActionResult> {
+  try {
+    if (isDemo()) throw new UserError('Switch to your workspace before deleting your account.');
+    const { sb, user, ws } = await requireWorkspace();
+    const typed = String(confirmEmail ?? '').trim().toLowerCase();
+    if (!typed || typed !== (user.email ?? '').toLowerCase()) throw new UserError('Type your account email exactly to confirm.');
+    for (const bucket of ['attachments', 'logos', 'content']) {
+      const files = await listFiles(sb, bucket, ws.id);
+      for (let i = 0; i < files.length; i += 100) {
+        const { error } = await sb.storage.from(bucket).remove(files.slice(i, i + 100));
+        if (error) throw error;
+      }
+    }
+    const { error } = await sb.rpc('delete_my_account', { p_confirm_email: typed });
+    if (error) throw error;
+    await sb.auth.signOut().catch(() => {});
+    cookies().delete('ci_demo');
+  } catch (e) {
+    return { ok: false, error: friendlyError(e) } as ActionResult;
+  }
+  redirect('/login?deleted=1');
 }
 
 // ---------- feedback ----------

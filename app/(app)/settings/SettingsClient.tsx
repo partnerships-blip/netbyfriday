@@ -6,7 +6,7 @@ import { FormModal } from '@/components/FormModal';
 import { goalFields } from '@/components/forms';
 import { ImportPrototype } from '@/components/ImportPrototype';
 import { useAction, toast } from '@/components/Toaster';
-import { saveBrand, saveProfile, savePrefs, saveGoals, setDemoMode } from '@/app/(app)/actions';
+import { saveBrand, saveProfile, savePrefs, saveGoals, setDemoMode, deleteMyAccount } from '@/app/(app)/actions';
 import { ACCENTS } from '@/lib/brand';
 import { flag } from '@/lib/flags';
 import { formatCents } from '@/lib/finance/core.js';
@@ -24,6 +24,17 @@ export function SettingsClient({ brand, profile, prefs, demo, email, goals }: { 
   const [p, setP] = useState({ displayName: profile.displayName, businessName: profile.businessName, niche: profile.niche, location: profile.location, platforms: profile.platforms.join(', ') });
   const [goalsOpen, setGoalsOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [delOpen, setDelOpen] = useState(false);
+  const [delEmail, setDelEmail] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [delError, setDelError] = useState('');
+  const delMatches = delEmail.trim().toLowerCase() === email.toLowerCase() && email !== '';
+  const removeAccount = async () => {
+    setDeleting(true); setDelError('');
+    try { const r = await deleteMyAccount(delEmail); if (r && !r.ok) setDelError(r.error); }   // on success the server redirects
+    catch { setDelError('Something went wrong. Nothing was deleted; try again.'); }
+    finally { setDeleting(false); }
+  };
   const refresh = () => router.refresh();
   const logo = async (f?: File) => {
     if (!f) return;
@@ -90,6 +101,25 @@ export function SettingsClient({ brand, profile, prefs, demo, email, goals }: { 
           <Btn variant="primary" onClick={() => run(() => setDemoMode(!demo), refresh)}>{demo ? 'Switch to my workspace' : 'View the demo'}</Btn>
           <Btn disabled={demo} onClick={() => setImportOpen(true)}>Import from the prototype</Btn>
         </div>
+      </Section>
+
+      <Section title="Delete account" sub="Permanently deletes your workspace and everything in it: partnerships, brands, contacts, invoices, payments, expenses, tasks, uploaded contracts, agreements (including signed ones), AI Advisor history and your login. This can't be undone.">
+        {!delOpen ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <Btn variant="danger" disabled={demo} onClick={() => setDelOpen(true)}>Delete my account</Btn>
+            {demo && <span className="text-[13px] text-muted">Switch to your workspace to delete your account.</span>}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3 rounded-[14px] border border-[#E8C9C0] bg-[#FBF3F0] p-4">
+            <p className="text-sm">Before you go: <a href="/api/export" className="underline underline-offset-2">export your data</a>, and download or print any signed agreements you need. Brands keep their own copy only if they saved it.</p>
+            <Field label={`Type ${email} to confirm`}><Input value={delEmail} onChange={e => setDelEmail(e.target.value)} autoComplete="off" spellCheck={false} placeholder={email} /></Field>
+            {delError && <p role="alert" className="text-sm text-danger">{delError}</p>}
+            <div className="flex flex-wrap gap-2">
+              <Btn variant="danger" disabled={!delMatches || deleting} onClick={removeAccount} className="!border-danger !bg-danger !text-white">{deleting ? 'Deleting…' : 'Permanently delete my account'}</Btn>
+              <Btn disabled={deleting} onClick={() => { setDelOpen(false); setDelEmail(''); setDelError(''); }}>Cancel</Btn>
+            </div>
+          </div>
+        )}
       </Section>
 
       <FormModal open={goalsOpen} onClose={() => setGoalsOpen(false)} title="Revenue goals" fields={goalFields} initial={{ monthly: goals.monthly ? String(goals.monthly / 100) : '', annual: goals.annual ? String(goals.annual / 100) : '' }} submitLabel="Save goals" action={async v => { const r = await saveGoals(v); if (r.ok) refresh(); return r; }} />

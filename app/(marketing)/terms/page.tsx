@@ -66,7 +66,7 @@ export default function Terms() {
       <p>The Service is free during the private beta. If we introduce paid plans, we’ll tell you the price before it applies, and nobody is moved to a paid plan without choosing it. Paid plans will have their own terms, which you’ll see before you buy.</p>
 
       <h2>10. Ending your use</h2>
-      <p>You can stop using netbyfriday at any time and ask us to delete your account by emailing <Mail />. We may suspend or close your account if you break these Terms, if we must for legal reasons, or to protect the Service or other people. We may also end the beta; when we can, we’ll give you reasonable notice so you can export your records. Signed agreements may be kept as described in our Privacy Policy. Sections 3 to 6 and 11 to 15 continue after your use ends.</p>
+      <p>You can stop using netbyfriday at any time and delete your account in Settings. Deleting is permanent and removes all your records, including signed agreements, so export anything you need first. We may suspend or close your account if you break these Terms, if we must for legal reasons, or to protect the Service or other people. We may also end the beta; when we can, we’ll give you reasonable notice so you can export your records. Sections 3 to 6 and 11 to 15 continue after your use ends.</p>
 
       <h2>11. Disclaimers</h2>
       <p>THE SERVICE IS PROVIDED “AS IS” AND “AS AVAILABLE.” TO THE FULLEST EXTENT ALLOWED BY LAW, WE DISCLAIM ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE AND NON-INFRINGEMENT. WE DON’T WARRANT THAT THE SERVICE WILL BE UNINTERRUPTED OR ERROR-FREE, THAT CALCULATIONS OR AI OUTPUT WILL BE ACCURATE OR COMPLETE, OR THAT ANY AGREEMENT OR TEMPLATE WILL BE ENFORCEABLE OR SUITABLE FOR YOUR PURPOSE.</p>
@@ -85,7 +85,7 @@ export default function Terms() {
       <p>These Terms and the Privacy Policy are the whole agreement between you and us about the Service. If any part is found unenforceable, the rest stays in effect. If we don’t enforce a part right away, we haven’t waived it. You can’t transfer these Terms without our consent; we may transfer them as part of a merger, acquisition or sale of assets. Neither party is responsible for delays caused by events outside its reasonable control.</p>
 
       <h2>16. Contact</h2>
-      <p>Net By Friday LLC · <Mail /> · [Mailing address to be added]</p>
+      <p>Net By Friday LLC · 2015 Jonesboro, Suite #305, McDonough, GA 30252 · <Mail /></p>
     </LegalPage>
   );
 }

@@ -77,8 +77,8 @@ export default function Privacy() {
       <h2>7. How long we keep information</h2>
       <ul>
         <li>Workspace records, uploaded contracts and AI Advisor history are kept while your account is open. You can delete individual records, and clear your Advisor history, at any time.</li>
-        <li>When you ask us to delete your account, we delete your workspace and records within 30 days, except as described below. Copies in routine backups are overwritten on the backup schedule.</li>
-        <li><b>Signed agreements.</b> A signed agreement is a record for both parties. If you delete your account, we may keep signed agreements and their audit trails for as long as needed to establish or defend legal claims or as required by law.</li>
+        <li>When you delete your account in Settings, your workspace, every record in it, your uploaded files, your waitlist entry and your login are deleted right away. Copies in routine backups are overwritten on our providers’ backup schedule.</li>
+        <li><b>Signed agreements are deleted too.</b> Deleting your account deletes the agreements in it, including signed ones and their audit trails, and their signing links stop working. Download or print any you need first; the other party keeps only the copy they saved.</li>
         <li>Waitlist entries are kept until you’re invited or ask to be removed.</li>
         <li>We may keep limited information as required by law, to resolve disputes, or to prevent abuse.</li>
       </ul>
@@ -90,7 +90,7 @@ export default function Privacy() {
       <ul>
         <li><b>Access and export.</b> Download your records at any time from Settings.</li>
         <li><b>Correction.</b> Edit your records directly in the app.</li>
-        <li><b>Deletion.</b> Delete records in the app, or ask us to delete your account or remove you from the waitlist by emailing <Mail />.</li>
+        <li><b>Deletion.</b> Delete individual records in the app, or delete your whole account in Settings under Delete account. To be removed from the waitlist, email <Mail />.</li>
         <li><b>Analytics.</b> Turn product analytics on or off in Settings.</li>
       </ul>
       <p>Depending on where you live (for example California, Virginia, Colorado or other US states with privacy laws), you may have rights to know, access, correct, delete, or receive a copy of your personal information, and to not be discriminated against for using these rights. We don’t sell or share personal information for targeted advertising, so there is nothing to opt out of. To make a request, email <Mail />. We’ll verify your request using your account email, and you may use an authorized agent. If we decline your request, you can appeal by replying to our response.</p>
@@ -106,7 +106,7 @@ export default function Privacy() {
       <p>We’ll update this page when our practices change and change the date at the top. If a change is significant, we’ll tell you in the app or by email before it takes effect.</p>
 
       <h2>13. Contact</h2>
-      <p>Net By Friday LLC · <Mail /> · [Mailing address to be added]</p>
+      <p>Net By Friday LLC · 2015 Jonesboro, Suite #305, McDonough, GA 30252 · <Mail /></p>
     </LegalPage>
   );
 }

@@ -7,11 +7,12 @@ import { Btn, Field, Input } from '@/components/ui';
 
 function Submit() { const { pending } = useFormStatus(); return <Btn variant="primary" size="lg" disabled={pending}>{pending ? 'Signing in…' : 'Sign in'}</Btn>; }
 
-export function LoginForm({ next, error }: { next: string; error?: string }) {
+export function LoginForm({ next, error, deleted }: { next: string; error?: string; deleted?: boolean }) {
   const [state, action] = useFormState(signIn, {});
   return (
     <AuthFrame>
       <div><h1 className="font-head text-[42px] leading-tight">Sign in</h1><p className="mt-2 text-[15px] text-muted">Welcome back.</p></div>
+      {deleted && <p role="status" className="rounded-xl border border-line bg-white p-4 text-[15px]">Your account and all of its records have been deleted.</p>}
       {error === 'access' && <p className="text-sm text-danger">This account doesn't have beta access.</p>}
       {error === 'link' && <p className="text-sm text-danger">That link has expired. Sign in or request a new one.</p>}
       <form action={action} className="flex flex-col gap-4">
