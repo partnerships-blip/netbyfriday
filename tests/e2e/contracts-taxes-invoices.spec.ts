@@ -33,7 +33,7 @@ test.describe.serial('contracts, taxes and invoice links', () => {
     await page.getByRole('button', { name: 'Read terms' }).click();
     await page.waitForURL(/\/contracts\/[0-9a-f-]{36}$/);
 
-    await expect(page.getByRole('heading', { name: 'Marigold Holiday Glow' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Marigold Beauty Co. x Casey Test' })).toBeVisible();   // titled Brand x Creator
     await expect(page.getByLabel('Brand', { exact: true })).toHaveValue('Marigold Beauty Co.');
     await expect(page.getByLabel('Total fee ($)')).toHaveValue('6500.00');                 // parsed by the engine, not the model
     await expect(page.getByText(/“[^”]*\$6,500(\.00)?[^”]*”/).first()).toBeVisible();  // the wording it came from (exact phrasing varies by model)              // the wording it came from
@@ -67,14 +67,14 @@ test.describe.serial('contracts, taxes and invoice links', () => {
     await page.goto('/partnerships');
     await page.getByRole('button', { name: /Marigold Holiday Glow/ }).first().click();
     const panel = page.getByRole('region', { name: 'Contracts' });
-    await expect(panel.getByText('Marigold Holiday Glow')).toBeVisible();
+    await expect(panel.getByText('Marigold Beauty Co. x Casey Test')).toBeVisible();
     await expect(panel.getByText('Confirmed', { exact: true })).toBeVisible();
     await expect(panel.getByText(/Usage until Feb 18/)).toBeVisible();
 
     // Unlink, then link it back from the drawer.
-    await panel.getByRole('button', { name: 'Unlink Marigold Holiday Glow' }).click();
+    await panel.getByRole('button', { name: 'Unlink Marigold Beauty Co. x Casey Test' }).click();
     await expect(panel.getByText('No contract linked yet.', { exact: false })).toBeVisible();
-    await panel.getByLabel('Existing contract').selectOption({ label: 'Marigold Holiday Glow · Marigold Beauty Co.' });
+    await panel.getByLabel('Existing contract').selectOption({ label: 'Marigold Beauty Co. x Casey Test' });
     await panel.getByRole('button', { name: 'Link', exact: true }).click();
     await expect(panel.getByText('Confirmed', { exact: true })).toBeVisible();
 

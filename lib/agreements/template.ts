@@ -27,8 +27,13 @@ const longDate = (iso: string) => new Date(iso + 'T00:00:00Z').toLocaleDateStrin
 const end = (s: string) => (/[.!?]$/.test(s.trim()) ? s.trim() : s.trim() + '.');
 const days = (n: string) => (n ? `${n} day${n === '1' ? '' : 's'}` : '');
 
+/** "Brand x Creator", e.g. "Honey Hair Co. x Poca". Falls back while either name is still missing. */
+export function partnershipTitle(brand: string, creator: string, fallback = 'Creator Partnership Agreement') {
+  const b = brand.trim(), c = creator.trim();
+  return b && c ? `${b} x ${c}` : b ? `${b} x Creator` : c ? `Brand x ${c}` : fallback;
+}
 export function agreementTitle(t: AgreementTerms) {
-  return `${t.campaign ? t.campaign + ' ' : ''}Creator Partnership Agreement`.trim();
+  return partnershipTitle(t.brandName, t.creatorName);
 }
 
 /** Required before the agreement can be signed and sent. */

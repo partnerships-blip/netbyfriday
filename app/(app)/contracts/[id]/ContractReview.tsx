@@ -35,7 +35,7 @@ export function ContractReview({ contract: c, deals, readOnly, today, demo }: { 
   const matching = deals.filter(d => v.brandName && d.brandName.toLowerCase() === v.brandName.toLowerCase());
   const [link, setLink] = useState<'none' | 'existing' | 'new'>(c.dealId ? 'existing' : matching.length ? 'existing' : 'new');
   const [dealId, setDealId] = useState(c.dealId ?? matching[0]?.id ?? '');
-  const [campaign, setCampaign] = useState(c.title);
+  const [campaign, setCampaign] = useState(x?.fields.campaign?.value || x?.fields.title?.value || c.title);   // the contract's own campaign name, not the "Brand x Creator" title
   const [updateFee, setUpdateFee] = useState(false);
   const [dels, setDels] = useState((x?.deliverables ?? []).map(d => ({ name: d.name, dueOn: d.dueOn ?? '', include: true, quote: d.quote, found: d.found })));
   const [reminders, setReminders] = useState(true);

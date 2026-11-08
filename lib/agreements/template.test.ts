@@ -13,7 +13,7 @@ const terms: AgreementTerms = {
 describe('agreement template', () => {
   it('fills in the creator’s terms with engine-formatted money and long dates', () => {
     const text = agreementText(renderAgreement(terms));
-    expect(text.startsWith('Spring Capsule Creator Partnership Agreement')).toBe(true);
+    expect(text.startsWith('Petalwear x Casey Test\n')).toBe(true);
     expect(text).toContain('between Casey Test (“Creator”) and Petalwear (“Brand”)');
     expect(text).toContain('a total fee of $4,200 (US dollars)');
     expect(text).toContain('• 1 Instagram Reel: publish by December 5, 2026');

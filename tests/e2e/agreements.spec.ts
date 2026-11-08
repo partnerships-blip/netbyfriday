@@ -88,7 +88,7 @@ test('generate a contract from a DM, sign and send it, and the brand signs from 
   await expect(page.getByText('Signed by both')).toBeVisible();
   await expect(page.getByText('Signed by Jordan Lee', { exact: false })).toBeVisible();
   await page.goto('/contracts');
-  await expect(page.getByText('Spring Capsule Creator Partnership Agreement')).toBeVisible();
+  await expect(page.getByText('Petalwear x Casey Test', { exact: true })).toBeVisible();
 
   // A screenshot works too (read once, not stored).
   await page.goto('/agreements/new');

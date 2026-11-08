@@ -1,3 +1,4 @@
+import { partnershipTitle } from '@/lib/agreements/template';
 import { NextResponse } from 'next/server';
 import { requireWritable, friendlyError, UserError } from '@/lib/auth';
 import { flag } from '@/lib/flags';
@@ -67,9 +68,13 @@ export async function POST(req: Request) {
     if (fileNote) extraction.warnings.unshift(fileNote);
     // Prefill the review form. These are proposals in a contract marked "review", not changes to any partnership or money record.
     const f = proposalToForm(extraction);
+    const { data: profile } = await sb.from('creator_profiles').select('display_name,business_name').eq('workspace_id', ws.id).maybeSingle();
+    const creatorName = (profile?.display_name || profile?.business_name || '').trim();
+    const brandForTitle = (f.brandName || deal?.brandName || '').trim();
+    const title = brandForTitle && creatorName ? partnershipTitle(brandForTitle, creatorName) : (f.title || fileName.replace(/\.(pdf|txt)$/i, '') || 'Pasted contract');
     const nul = (s: string) => s || null;
     const { data, error } = await sb.from('contracts').insert({
-      workspace_id: ws.id, deal_id: deal?.id ?? null, status: 'review', title: (f.title || fileName.replace(/\.(pdf|txt)$/i, '') || 'Pasted contract').slice(0, 200), file_name: fileName, storage_path: storagePath,
+      workspace_id: ws.id, deal_id: deal?.id ?? null, status: 'review', title: title.slice(0, 200), file_name: fileName, storage_path: storagePath,
       extracted: extraction, brand_name: (f.brandName || deal?.brandName || '').slice(0, 160), fee_cents: f.fee ? parseMoneyToCents(f.fee) : null, payment_terms: f.paymentTerms.slice(0, 200), signed_on: nul(f.signedOn),
       usage_rights: f.usageRights.slice(0, 1000), usage_starts_on: nul(f.usageStartsOn), usage_ends_on: nul(f.usageEndsOn),
       exclusivity: f.exclusivity.slice(0, 1000), exclusivity_starts_on: nul(f.exclusivityStartsOn), exclusivity_ends_on: nul(f.exclusivityEndsOn),

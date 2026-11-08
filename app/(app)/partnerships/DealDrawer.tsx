@@ -225,7 +225,7 @@ function ContractsPanel({ deal, contracts, agreements, readOnly, onChange }: { d
           {unlinked.length > 0 && <>
             <Select aria-label="Existing contract" value={pick} onChange={e => setPick(e.target.value)} className="h-9 w-auto max-w-full">
               <option value="">Link an existing contract…</option>
-              {unlinked.map(c => <option key={c.id} value={c.id}>{c.title}{c.brandName ? ` · ${c.brandName}` : ''}{c.status === 'review' ? ' (needs review)' : ''}</option>)}
+              {unlinked.map(c => <option key={c.id} value={c.id}>{c.title}{c.brandName && !c.title.includes(c.brandName) ? ` · ${c.brandName}` : ''}{c.status === 'review' ? ' (needs review)' : ''}</option>)}
             </Select>
             <Btn size="sm" disabled={!pick || pending} onClick={() => run(() => linkContract({ contractId: pick, dealId: deal.id }), () => { setPick(''); onChange(); })}>Link</Btn>
           </>}
