@@ -1,16 +1,14 @@
 # Contract generator and e-signing (flag: `agreements`)
 
-**Status:** built 2026-11-08. Off for creators by default; on for beta admins so the founder can use and review it.
+**Status:** live for everyone since 2026-11-08 (founder decision), on by default (`DEFAULT_ON` in `lib/flags.ts`). To switch it off for a deployment, add `-agreements` to `NEXT_PUBLIC_NBF_FLAGS` and redeploy.
 
 A creator pastes a brand email, DM or notes (or uploads a screenshot). netbyfriday proposes the terms that were discussed, fills them into a fixed plain-English agreement template, and the creator edits every term. The creator signs, then sends a private link from their own email app. The brand opens the link without an account, agrees to sign electronically, and signs. Both sides can download the signed copy with its audit trail.
 
-## Before turning it on for everyone (founder)
+## Still to do (founder)
 
 1. **Have a lawyer review the template** in `lib/agreements/template.ts`: every section's wording, the fallbacks used when a term is missing (usage rights, kill fee, exclusivity), and the consent wording on the signing page (`app/sign/[token]/SignForm.tsx`) and in the creator's sign step. Change the template's text there; tests in `lib/agreements/template.test.ts` show what each section produces.
 2. **Update the Terms of Service** to cover the generator and e-signing, including that netbyfriday is not a party to the agreements and doesn't give legal advice.
-3. **Turn it on:** add `agreements` to `NEXT_PUBLIC_NBF_FLAGS` in Vercel (e.g. `agreements` alongside any existing values) and redeploy.
-
-Until then, only users in the `admins` table see **Generate a contract** (Contracts page and the partnership drawer).
+It was turned on before the legal review. Until the review is done, treat the template as a starting point and update its wording as the lawyer advises.
 
 ## How it stays inside the rules
 
