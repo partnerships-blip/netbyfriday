@@ -45,6 +45,10 @@ test('delete my account from Settings', async ({ page }) => {
   await page.goto('/login');
   await page.getByLabel('Email').fill(U.email);
   await page.getByLabel('Password').fill(U.password);
+  await expect(page.getByLabel('Password')).toHaveAttribute('type', 'password');
+  await page.getByRole('button', { name: 'Show', exact: true }).click();          // show password
+  await expect(page.getByLabel('Password')).toHaveAttribute('type', 'text');
+  await expect(page.getByRole('button', { name: 'Hide', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page.getByRole('alert')).toBeVisible();
   await expect(page).toHaveURL(/\/login/);

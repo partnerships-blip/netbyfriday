@@ -4,6 +4,7 @@ import { useFormState, useFormStatus } from 'react-dom';
 import { signUp } from '../auth-actions';
 import { AuthFrame } from '../AuthFrame';
 import { Btn, Eyebrow, Field, Input } from '@/components/ui';
+import { PasswordInput } from '@/components/PasswordInput';
 
 function Submit() { const { pending } = useFormStatus(); return <Btn variant="primary" size="lg" disabled={pending}>{pending ? 'Creating…' : 'Create account'}</Btn>; }
 
@@ -17,7 +18,7 @@ export default function SignUpPage() {
         <form action={action} className="flex flex-col gap-4">
           <Field label="Invite code"><Input name="inviteCode" autoComplete="off" placeholder="From your invitation" className="font-mono uppercase" required /></Field>
           <Field label="Email"><Input name="email" type="email" autoComplete="email" required /></Field>
-          <Field label="Password"><Input name="password" type="password" autoComplete="new-password" minLength={10} placeholder="At least 10 characters" required /></Field>
+          <Field label="Password"><PasswordInput name="password" autoComplete="new-password" minLength={10} placeholder="At least 10 characters" required /></Field>
           {state.error && <p role="alert" className="text-sm text-danger">{state.error}</p>}
           <Submit />
           <p className="text-xs leading-relaxed text-muted">By creating an account, you confirm you’re 18 or older and agree to the <Link href="/terms" className="text-ink underline underline-offset-2">Terms and Conditions</Link> and <Link href="/privacy" className="text-ink underline underline-offset-2">Privacy Policy</Link>.</p>

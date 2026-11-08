@@ -4,6 +4,7 @@ import { useFormState, useFormStatus } from 'react-dom';
 import { signIn } from '../auth-actions';
 import { AuthFrame } from '../AuthFrame';
 import { Btn, Field, Input } from '@/components/ui';
+import { PasswordInput } from '@/components/PasswordInput';
 
 function Submit() { const { pending } = useFormStatus(); return <Btn variant="primary" size="lg" disabled={pending}>{pending ? 'Signing in…' : 'Sign in'}</Btn>; }
 
@@ -18,7 +19,7 @@ export function LoginForm({ next, error, deleted }: { next: string; error?: stri
       <form action={action} className="flex flex-col gap-4">
         <input type="hidden" name="next" value={next} />
         <Field label="Email"><Input name="email" type="email" autoComplete="email" required /></Field>
-        <Field label="Password"><Input name="password" type="password" autoComplete="current-password" required /></Field>
+        <Field label="Password"><PasswordInput name="password" autoComplete="current-password" required /></Field>
         {state.error && <p role="alert" className="text-sm text-danger">{state.error}</p>}
         <div className="flex items-center gap-4"><Submit /><Link href="/reset" className="text-sm text-sub underline underline-offset-2">Forgot password</Link></div>
       </form>
