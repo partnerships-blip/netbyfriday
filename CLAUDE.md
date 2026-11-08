@@ -5,7 +5,7 @@ You're building NETBYFRIDAY 1.0: a structured business workspace where creators 
 ## Scope
 - **Build:** invite-only auth and onboarding; the dashboards; record types with table, board and calendar views where the plan lists them (partnerships, deliverables, invoices, payments, brands, contacts, tasks, income, expenses); related-records panels; the AI Advisor (questions, overdue, upcoming responsibilities, drafts, suggested next actions); settings; the marketing site and waitlist; Stripe only when the paid beta starts.
 - **Behind flags (don't delete):** Insights, Opportunities, Audience, attachments, prototype import, white-label branding. Flags: `NEXT_PUBLIC_NBF_FLAGS` and `lib/flags.ts`.
-- **Don't build:** a Notion clone (no free-form pages, block editor or custom properties), Gmail or inbox scanning, calendar sync, social APIs, bank connections, Google Sign-In, outbound email, Resend, Inngest, PostHog, Sentry, multi-currency.
+- **Don't build:** a Notion clone (no free-form pages, block editor or custom properties), Gmail or inbox scanning, calendar sync, social APIs, bank connections, Google Sign-In, outbound email (one exception: founder alerts to our own inbox via Google Workspace SMTP, `docs/FOUNDER_ALERTS.md`), Resend, Inngest, PostHog, Sentry, multi-currency.
 - **Stack only:** Next.js, TypeScript, Tailwind, Supabase (Auth + Postgres), Vercel, and one AI provider. Stripe is added at M5. Ask before adding any other dependency or service.
 
 ## Rules

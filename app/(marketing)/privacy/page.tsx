@@ -65,7 +65,7 @@ export default function Privacy() {
       <h2>5. Who we share information with</h2>
       <p>We share information only as described here:</p>
       <ul>
-        <li><b>Service providers</b> who process data for us under contract: Supabase (database, authentication and file storage), Vercel (hosting), and Anthropic (AI processing). When paid plans begin, Stripe will process payments; we won’t see or store full card numbers.</li>
+        <li><b>Service providers</b> who process data for us under contract: Supabase (database, authentication and file storage), Vercel (hosting), Anthropic (AI processing), and Google Workspace (our team email, which receives a notice when you join the waitlist). When paid plans begin, Stripe will process payments; we won’t see or store full card numbers.</li>
         <li><b>People you choose to share with.</b> When you send an invoice link or an agreement link, anyone with that link can view that document. A signed agreement, including its audit trail, is available to both parties.</li>
         <li><b>Legal reasons.</b> If required by law, or to protect the rights, safety or property of our users, the public, or netbyfriday.</li>
         <li><b>Business transfers.</b> If netbyfriday is involved in a merger, acquisition or sale of assets, your information may transfer as part of that deal, and this policy will continue to apply to it.</li>

@@ -1,6 +1,7 @@
 'use server';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
+import { sendWaitlistAlert } from '@/lib/notify/founder';
 
 const Schema = z.object({
   email: z.string().trim().toLowerCase().email('Enter a valid email address.').max(254),
@@ -19,5 +20,7 @@ export async function joinWaitlist(_: WaitlistState, form: FormData): Promise<Wa
   const v = p.data;
   const { data, error } = await createClient().rpc('join_waitlist', { p_email: v.email, p_name: v.name, p_handle: v.handle, p_creator_type: v.creatorType, p_source: v.source, p_consent: true });
   if (error) { console.error('[waitlist]', error.message); return { error: 'Something went wrong. Please try again in a minute.' }; }
-  return data === 'already' ? { ok: true, already: true } : { ok: true };
+  if (data === 'already') return { ok: true, already: true };
+  await sendWaitlistAlert({ email: v.email, name: v.name, handle: v.handle, creatorType: v.creatorType, source: v.source });   // never blocks the request
+  return { ok: true };
 }
