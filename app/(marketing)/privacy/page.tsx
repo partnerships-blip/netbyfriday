@@ -106,7 +106,7 @@ export default function Privacy() {
       <p>We’ll update this page when our practices change and change the date at the top. If a change is significant, we’ll tell you in the app or by email before it takes effect.</p>
 
       <h2>13. Contact</h2>
-      <p>Net By Friday LLC · 2015 Jonesboro, Suite #305, McDonough, GA 30252 · <Mail /></p>
+      <p>Net By Friday LLC · 2015 Jonesboro Rd, Suite #305, McDonough, GA 30252 · <Mail /></p>
     </LegalPage>
   );
 }

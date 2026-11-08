@@ -85,7 +85,7 @@ export default function Terms() {
       <p>These Terms and the Privacy Policy are the whole agreement between you and us about the Service. If any part is found unenforceable, the rest stays in effect. If we don’t enforce a part right away, we haven’t waived it. You can’t transfer these Terms without our consent; we may transfer them as part of a merger, acquisition or sale of assets. Neither party is responsible for delays caused by events outside its reasonable control.</p>
 
       <h2>16. Contact</h2>
-      <p>Net By Friday LLC · 2015 Jonesboro, Suite #305, McDonough, GA 30252 · <Mail /></p>
+      <p>Net By Friday LLC · 2015 Jonesboro Rd, Suite #305, McDonough, GA 30252 · <Mail /></p>
     </LegalPage>
   );
 }
