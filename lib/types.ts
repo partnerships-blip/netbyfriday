@@ -83,11 +83,20 @@ export interface Contract {
   whitelisting: string; revisions: string; killFee: string; otherTerms: string;
   extracted: ContractExtraction | null; confirmedAt: string | null; createdAt: string;
 }
+/** A contract generated from the creator's messages and signed through a private link (flag: agreements). */
+export interface Agreement {
+  id: string; dealId: string | null; status: 'draft' | 'sent' | 'signed' | 'void'; title: string; sourceText: string;
+  extracted: ContractExtraction | null; terms: Record<string, unknown>; body: string; bodySha256: string | null; shareToken: string | null;
+  creatorName: string; creatorEmail: string; creatorSignature: string; creatorSignedAt: string | null; sentAt: string | null; firstViewedAt: string | null;
+  signerName: string; signerTitle: string; signerEmail: string; signerSignature: string; signedAt: string | null; voidedAt: string | null;
+  audit: { event: string; at: string; by?: string; email?: string; ip?: string; user_agent?: string; sha256?: string }[];
+  createdAt: string; updatedAt: string;
+}
 /** One proposed value from the contract, with the wording it came from. `found` = the quote was located in the text. */
 export interface ExtractedField { value: string; quote: string; found?: boolean }
 export interface ContractExtraction {
-  source: 'pdf' | 'text';
-  fields: Partial<Record<'title' | 'brandName' | 'fee' | 'paymentTerms' | 'signedOn' | 'usageRights' | 'usageDays' | 'usageStartsOn' | 'usageEndsOn'
+  source: 'pdf' | 'text' | 'image';
+  fields: Partial<Record<'title' | 'campaign' | 'contactName' | 'contactEmail' | 'brandName' | 'fee' | 'paymentTerms' | 'signedOn' | 'usageRights' | 'usageDays' | 'usageStartsOn' | 'usageEndsOn'
     | 'exclusivity' | 'exclusivityDays' | 'exclusivityStartsOn' | 'exclusivityEndsOn' | 'whitelisting' | 'revisions' | 'killFee' | 'otherTerms', ExtractedField>>;
   deliverables: { name: string; dueOn: string | null; quote: string; found?: boolean }[];
   warnings: string[];

@@ -15,12 +15,12 @@ import { DELIVERABLE_LABEL } from '@/lib/brand';
 import type { Contact, Contract, Deal, Deliverable, Stage, Task } from '@/lib/types';
 import Link from 'next/link';
 import { TaskList } from '@/components/TaskList';
-import type { InvoiceLite } from './Board';
+import type { InvoiceLite, AgreementLite } from './Board';
 
 const DTONE: Record<string, any> = { not_started: 'neutral', in_progress: 'accent', in_review: 'warn', approved: 'ok', posted: 'ok', scheduled: 'neutral' };
 const DRAFTS = ['Following up on an unanswered proposal', 'Requesting a contract', 'Following up on payment', 'Reconnecting with a previous partner', 'Proposing a new campaign'];
 
-export function DealDrawer({ deal, allDeals, contacts = [], tasks = [], contracts = [], invoices, received, onClose, onMove, onSettle, readOnly, today }: { onSettle?: (id: string) => void; deal: Deal | null; allDeals: Deal[]; contacts?: Contact[]; tasks?: Task[]; contracts?: Contract[]; invoices: InvoiceLite[]; received: Record<string, number>; onClose: () => void; onMove: (id: string, s: Stage) => void; readOnly: boolean; today: string }) {
+export function DealDrawer({ deal, allDeals, contacts = [], tasks = [], contracts = [], agreements = null, invoices, received, onClose, onMove, onSettle, readOnly, today }: { onSettle?: (id: string) => void; deal: Deal | null; allDeals: Deal[]; contacts?: Contact[]; tasks?: Task[]; contracts?: Contract[]; agreements?: AgreementLite[] | null; invoices: InvoiceLite[]; received: Record<string, number>; onClose: () => void; onMove: (id: string, s: Stage) => void; readOnly: boolean; today: string }) {
   const router = useRouter();
   const [pending, run] = useAction();
   const [editing, setEditing] = useState(false);
@@ -67,7 +67,7 @@ export function DealDrawer({ deal, allDeals, contacts = [], tasks = [], contract
           {facts.map(([k, v]) => <div key={k} className="flex flex-col gap-0.5 bg-white px-3 py-2.5"><dt className="text-[11px] text-muted">{k}</dt><dd className="break-words text-sm leading-snug">{v || '—'}</dd></div>)}
         </dl>
 
-        {flag('contracts') && <ContractsPanel deal={deal} contracts={contracts} readOnly={readOnly} onChange={refresh} />}
+        {flag('contracts') && <ContractsPanel deal={deal} contracts={contracts} agreements={agreements} readOnly={readOnly} onChange={refresh} />}
 
         <section className="flex flex-col gap-2">
           <Eyebrow>Deliverables</Eyebrow>
@@ -175,13 +175,15 @@ function Attachments({ dealId, files, readOnly, onChange }: { dealId: string; fi
 }
 
 /** Contracts on this partnership: see them, upload a new one (it starts linked here), or link one already uploaded. */
-function ContractsPanel({ deal, contracts, readOnly, onChange }: { deal: Deal; contracts: Contract[]; readOnly: boolean; onChange: () => void }) {
+function ContractsPanel({ deal, contracts, agreements, readOnly, onChange }: { deal: Deal; contracts: Contract[]; agreements: AgreementLite[] | null; readOnly: boolean; onChange: () => void }) {
   const router = useRouter();
   const [pending, run] = useAction();
   const [busy, setBusy] = useState(false);
   const [pick, setPick] = useState('');
   const input = useRef<HTMLInputElement>(null);
   const linked = contracts.filter(c => c.dealId === deal.id);
+  const generated = (agreements ?? []).filter(a => a.dealId === deal.id);
+  const AGR = { draft: ['Draft', 'neutral'], sent: ['Waiting for signature', 'warn'], signed: ['Signed', 'ok'], void: ['Void', 'neutral'] } as const;
   const unlinked = contracts.filter(c => !c.dealId);
   const upload = async (f?: File) => {
     if (!f) return;
@@ -209,10 +211,16 @@ function ContractsPanel({ deal, contracts, readOnly, onChange }: { deal: Deal; c
           {c.hasFile && <a href={`/api/contracts/${c.id}/file`} target="_blank" rel="noopener" className="text-xs text-muted hover:text-ink">View file</a>}
           {!readOnly && <button className="text-xs text-muted hover:text-danger" aria-label={`Unlink ${c.title}`} disabled={pending} onClick={() => run(() => linkContract({ contractId: c.id, dealId: null }), onChange)}>Unlink</button>}
         </div>))}
-      {!linked.length && <p className="text-sm text-muted">No contract linked yet. Upload the agreement and netbyfriday reads the terms for you to check.</p>}
+      {generated.map(g => (
+        <Link key={g.id} href={`/agreements/${g.id}`} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-line px-3 py-2.5 hover:border-faint">
+          <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{g.title}</span><span className="block text-xs text-muted">Generated with netbyfriday</span></span>
+          <Pill tone={AGR[g.status][1]}>{AGR[g.status][0]}</Pill>
+        </Link>))}
+      {!linked.length && !generated.length && <p className="text-sm text-muted">No contract linked yet. Upload the agreement and netbyfriday reads the terms for you to check{agreements ? ', or generate one from the brand’s message' : ''}.</p>}
       {!readOnly && (
         <div className="flex flex-wrap items-center gap-2">
           <Btn size="sm" variant="primary" disabled={busy} onClick={() => input.current?.click()}>{busy ? 'Reading contract…' : 'Upload contract'}</Btn>
+          {agreements && <Link href={`/agreements/new?deal=${deal.id}`} className="inline-flex h-8 items-center rounded-[10px] border border-line2 bg-white px-3 text-[13px] font-medium hover:border-ink">Generate contract</Link>}
           <input ref={input} type="file" accept="application/pdf,text/plain" className="hidden" aria-label="Contract file" onChange={e => upload(e.target.files?.[0])} />
           {unlinked.length > 0 && <>
             <Select aria-label="Existing contract" value={pick} onChange={e => setPick(e.target.value)} className="h-9 w-auto max-w-full">

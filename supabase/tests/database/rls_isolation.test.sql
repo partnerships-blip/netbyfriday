@@ -2,7 +2,7 @@
 -- Verifies invite gating, workspace isolation, cross-tenant FK protection, and payment guards.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(36);
+select plan(51);
 
 insert into public.invite_codes(code, max_uses) values ('PGTAP-TEST', 5);
 
@@ -72,6 +72,31 @@ insert into public.content_items (id, workspace_id, title) values ('c0000000-000
 insert into public.content_snapshots (workspace_id, content_id, measured_on, period, views) values ((select id from t_ws where owner_id = '11111111-1111-1111-1111-111111111111'), 'c0000000-0000-4000-8000-00000000000a', '2026-11-01', '24h', 2599);
 insert into public.content_reports (workspace_id, content_id, mode, input_hash, report) values ((select id from t_ws where owner_id = '11111111-1111-1111-1111-111111111111'), 'c0000000-0000-4000-8000-00000000000a', 'creative', repeat('a', 64), '{}');
 
+-- Agreements: drafts only on insert, text frozen once sent, signing only through the link.
+select lives_ok(
+  $$ insert into public.agreements (id, workspace_id, deal_id, title, terms)
+     values ('aaaaaaaa-0000-0000-0000-000000000006', (select id from t_ws where owner_id = '11111111-1111-1111-1111-111111111111'),
+             'aaaaaaaa-0000-0000-0000-000000000002', 'Launch agreement', '{"fee":"5000"}') $$,
+  'A drafts an agreement on their own partnership');
+select throws_ok(
+  $$ insert into public.agreements (workspace_id, title, status, signed_at)
+     values ((select id from t_ws where owner_id = '11111111-1111-1111-1111-111111111111'), 'Pre-signed', 'signed', now()) $$,
+  '23514', 'AGREEMENT_NEW_MUST_BE_DRAFT', 'an agreement cannot be created already signed');
+select lives_ok(
+  $$ update public.agreements set status = 'sent', body = 'Launch agreement body', body_sha256 = '15ef33a8b6567cab1da5eb250445e5ebf3f61b1263e0c1fa037af4db348969f5',
+       share_token = 'dddddddd-0000-0000-0000-000000000001', creator_signature = 'Avery A', creator_signed_at = now(), sent_at = now()
+     where id = 'aaaaaaaa-0000-0000-0000-000000000006' $$,
+  'A signs and sends their agreement');
+select throws_ok(
+  $$ update public.agreements set body = 'Something else' where id = 'aaaaaaaa-0000-0000-0000-000000000006' $$,
+  '23514', 'AGREEMENT_LOCKED', 'sent agreement text cannot be changed');
+select throws_ok(
+  $$ update public.agreements set status = 'signed' where id = 'aaaaaaaa-0000-0000-0000-000000000006' $$,
+  '23514', 'AGREEMENT_SIGN_VIA_LINK', 'the creator cannot mark it signed for the brand');
+select throws_ok(
+  $$ update public.agreements set signer_name = 'Fake Brand' where id = 'aaaaaaaa-0000-0000-0000-000000000006' $$,
+  '42501', null, 'signer fields are not writable from the app');
+
 -- ---------- as user B ----------
 select set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}', true);
 
@@ -126,12 +151,33 @@ select throws_ok(
 select throws_ok(
   $$ insert into public.content_snapshots (workspace_id, content_id, measured_on, period) values ((select id from t_ws where owner_id = '22222222-2222-2222-2222-222222222222'), 'c0000000-0000-4000-8000-00000000000a', '2026-11-02', '24h') $$,
   '23503', null, 'B cannot attach a snapshot in its own workspace to A content');
+select is((select count(*)::int from public.agreements), 0, 'B cannot see A agreements');
+select throws_ok(
+  $$ insert into public.agreements (workspace_id, title) values ((select id from t_ws where owner_id = '11111111-1111-1111-1111-111111111111'), 'Hijack') $$,
+  '42501', null, 'B cannot add an agreement to A workspace');
 select is(public.shared_invoice(null), null, 'no token, no invoice');
 
 -- ---------- anonymous (a brand opening a shared invoice link) ----------
 set local role anon;
 select is(public.shared_invoice('cccccccc-0000-0000-0000-000000000001')->>'number', 'INV-1', 'anyone with the link sees that one invoice');
 select is(public.shared_invoice('cccccccc-0000-0000-0000-000000000002'), null, 'a wrong token reveals nothing');
+
+-- ---------- anonymous (a brand signing from the creator's link) ----------
+select is(public.shared_agreement('dddddddd-0000-0000-0000-000000000001')->>'title', 'Launch agreement', 'the brand sees the agreement from the link');
+select is(public.shared_agreement('dddddddd-0000-0000-0000-000000000002'), null, 'a wrong agreement token reveals nothing');
+select throws_ok(
+  $$ select public.sign_agreement('dddddddd-0000-0000-0000-000000000001', repeat('0', 64), 'Dana Brand', 'Partnerships', 'dana@brand.test', 'Dana Brand', true, '1.2.3.4', 'test') $$,
+  '23514', 'AGREEMENT_CHANGED', 'signing fails if the text shown is not the text on file');
+select throws_ok(
+  $$ select public.sign_agreement('dddddddd-0000-0000-0000-000000000001', '15ef33a8b6567cab1da5eb250445e5ebf3f61b1263e0c1fa037af4db348969f5', 'Dana Brand', '', 'dana@brand.test', 'Dana Brand', false, '1.2.3.4', 'test') $$,
+  '23514', 'CONSENT_REQUIRED', 'signing needs consent to sign electronically');
+select lives_ok(
+  $$ select public.sign_agreement('dddddddd-0000-0000-0000-000000000001', '15ef33a8b6567cab1da5eb250445e5ebf3f61b1263e0c1fa037af4db348969f5', 'Dana Brand', 'Partnerships', 'dana@brand.test', 'Dana Brand', true, '1.2.3.4', 'test') $$,
+  'the brand signs from the link');
+select is(public.shared_agreement('dddddddd-0000-0000-0000-000000000001')->>'status', 'signed', 'the agreement is signed');
+select throws_ok(
+  $$ select public.sign_agreement('dddddddd-0000-0000-0000-000000000001', '15ef33a8b6567cab1da5eb250445e5ebf3f61b1263e0c1fa037af4db348969f5', 'Dana Brand', '', 'dana@brand.test', 'Dana Brand', true, '1.2.3.4', 'test') $$,
+  '23514', 'AGREEMENT_NOT_OPEN', 'a signed agreement cannot be signed again');
 
 select * from finish();
 rollback;

@@ -26,11 +26,32 @@ function readContract(text) {
   return JSON.stringify({ fields, deliverables, warnings: ['Usage starts on the first post date, which the contract doesn’t give. Add it once you post.'] });
 }
 
+// Contract generator stand-in: reads deal terms from a brand message (or, for a screenshot, from the sample DM).
+const SAMPLE_DM = fs.readFileSync(new URL('./fixtures/sample-deal-dm.txt', import.meta.url), 'utf8');
+function readMessage(text) {
+  const fields = {}, grab = (key, re, value = m => m[1] ?? m[0]) => { const m = text.match(re); if (m) fields[key] = { value: value(m), quote: m[0].trim() }; };
+  grab('campaign', /on our (Spring Capsule) campaign/);
+  grab('brandName', /Jordan Lee from (Petalwear)/);
+  grab('contactName', /This is (Jordan Lee) from/);
+  grab('contactEmail', /([\w.]+@[\w.]+\.test)/);
+  grab('fee', /Budget is (\$[\d,]+) total/);
+  grab('paymentTerms', /paid (Net 30 after the posts go live)/);
+  grab('usageRights', /Usage: (organic reposting on Petalwear's channels) for 60 days/);
+  grab('usageDays', /for (60) days/, m => 60);
+  const deliverables = [...text.matchAll(/(\d (?:Instagram|TikTok) \w+) live by (\d{4}-\d{2}-\d{2})/g)].map(m => ({ name: m[1], dueOn: m[2], quote: m[0] }));
+  return JSON.stringify({ fields, deliverables, warnings: ['Exclusivity: the brand said none is needed, so it was left empty.'] });
+}
+
 http.createServer((req, res) => {
   let body = '';
   req.on('data', c => (body += c));
   req.on('end', () => {
     const { system, messages = [] } = JSON.parse(body || '{}');
+    if (String(system).startsWith('You read messages between a content creator')) {
+      const doc = messages[0]?.content?.[0];
+      res.writeHead(200, { 'content-type': 'application/json' });
+      return res.end(JSON.stringify({ content: [{ type: 'text', text: readMessage(doc?.type === 'document' && doc?.source?.type === 'text' ? doc.source.data : SAMPLE_DM) }] }));
+    }
     if (String(system).startsWith('You read brand partnership contracts')) {
       const doc = messages[0]?.content?.[0];
       res.writeHead(200, { 'content-type': 'application/json' });

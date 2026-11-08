@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { parseMoneyToCents, addDays } from '../finance/core.js';
 import type { ContractExtraction, ExtractedField } from '../types';
 
-export const FIELD_KEYS = ['title', 'brandName', 'fee', 'paymentTerms', 'signedOn', 'usageRights', 'usageDays', 'usageStartsOn', 'usageEndsOn',
+export const FIELD_KEYS = ['title', 'campaign', 'contactName', 'contactEmail', 'brandName', 'fee', 'paymentTerms', 'signedOn', 'usageRights', 'usageDays', 'usageStartsOn', 'usageEndsOn',
   'exclusivity', 'exclusivityDays', 'exclusivityStartsOn', 'exclusivityEndsOn', 'whitelisting', 'revisions', 'killFee', 'otherTerms'] as const;
 type Key = typeof FIELD_KEYS[number];
 
@@ -44,7 +44,7 @@ const Raw = z.object({
 export const normalize = (s: string) => s.toLowerCase().replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/[–—]/g, '-').replace(/\s+/g, ' ').trim();
 
 /** Turns the model's raw reply into a checked proposal. `sourceText` (when we have the text) is used to confirm each quote. */
-export function parseExtraction(raw: string, source: 'pdf' | 'text', sourceText?: string): ContractExtraction {
+export function parseExtraction(raw: string, source: 'pdf' | 'text' | 'image', sourceText?: string): ContractExtraction {
   const out: ContractExtraction = { source, fields: {}, deliverables: [], warnings: [] };
   const start = raw.indexOf('{'), end = raw.lastIndexOf('}');
   let json: unknown;
@@ -92,7 +92,7 @@ export function proposalToForm(x: ContractExtraction | null) {
 }
 
 export function label(k: string) {
-  return ({ title: 'title', brandName: 'brand', fee: 'fee', paymentTerms: 'payment terms', signedOn: 'signed date', usageRights: 'usage rights', usageDays: 'usage length',
+  return ({ title: 'title', campaign: 'campaign', contactName: 'brand contact', contactEmail: 'brand contact email', brandName: 'brand', fee: 'fee', paymentTerms: 'payment terms', signedOn: 'signed date', usageRights: 'usage rights', usageDays: 'usage length',
     usageStartsOn: 'usage start', usageEndsOn: 'usage end', exclusivity: 'exclusivity', exclusivityDays: 'exclusivity length', exclusivityStartsOn: 'exclusivity start',
     exclusivityEndsOn: 'exclusivity end', whitelisting: 'whitelisting', revisions: 'revisions', killFee: 'kill fee', otherTerms: 'other terms' } as Record<string, string>)[k] ?? k;
 }

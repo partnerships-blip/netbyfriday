@@ -14,9 +14,10 @@ import type { Contact, Contract, Deal, Stage, Task } from '@/lib/types';
 import { RecordView, type Column } from '@/components/RecordView';
 import { STAGE_LABEL } from '@/lib/brand';
 
+export type AgreementLite = { id: string; dealId: string | null; title: string; status: 'draft' | 'sent' | 'signed' | 'void' };
 export type InvoiceLite = { id: string; number: string; dealId: string | null; clientName: string; amountCents: number; paidCents: number; state: string; payments: { id: string; date: string; amountCents: number }[] };
 
-export function Board({ deals: initial, invoices, received, summary, initialDeal, readOnly, today, contacts, tasks, contracts = [] }: { deals: Deal[]; invoices: InvoiceLite[]; received: Record<string, number>; summary: string; initialDeal: string | null; readOnly: boolean; today: string; contacts: Contact[]; tasks: Task[]; contracts?: Contract[] }) {
+export function Board({ deals: initial, invoices, received, summary, initialDeal, readOnly, today, contacts, tasks, contracts = [], agreements = null }: { deals: Deal[]; invoices: InvoiceLite[]; received: Record<string, number>; summary: string; initialDeal: string | null; readOnly: boolean; today: string; contacts: Contact[]; tasks: Task[]; contracts?: Contract[]; agreements?: AgreementLite[] | null }) {
   const router = useRouter();
   const [deals, setDeals] = useState(initial);
   const [sel, setSel] = useState<string | null>(initialDeal);
@@ -110,7 +111,7 @@ export function Board({ deals: initial, invoices, received, summary, initialDeal
         )} />
       <p className="text-xs text-muted">Drag cards between stages on desktop, or open a card to change its stage.</p>
       <FormModal open={adding} onClose={() => setAdding(false)} title="New partnership" fields={dealFields} initial={{ stage: 'lead' }} submitLabel="Add partnership" action={async v => { const r = await createDeal(v); if (r.ok) router.refresh(); return r; }} />
-      <DealDrawer deal={selected} allDeals={deals} contacts={contacts} tasks={tasks} contracts={contracts} invoices={invoices} received={received} onClose={() => { setSel(null); router.replace('/partnerships', { scroll: false }); }} onMove={move} onSettle={settle} readOnly={readOnly} today={today} />
+      <DealDrawer deal={selected} allDeals={deals} contacts={contacts} tasks={tasks} contracts={contracts} agreements={agreements} invoices={invoices} received={received} onClose={() => { setSel(null); router.replace('/partnerships', { scroll: false }); }} onMove={move} onSettle={settle} readOnly={readOnly} today={today} />
       {askAmount && <FormModal open onClose={() => setAskAmount(null)} title="How much did you receive?"
         note="This partnership has an estimated or $0 fee, so enter what was actually paid. It’s recorded as a payment and counts as revenue."
         fields={[{ name: 'amount', label: 'Amount received ($)', type: 'money', required: true }, { name: 'receivedOn', label: 'Date received', type: 'date', required: true }]}

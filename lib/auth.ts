@@ -47,6 +47,8 @@ export function friendlyError(e: unknown): string {
   if (msg.includes('INVOICE_VOID')) return 'This invoice is void. Payments cannot be added.';
   if (msg.includes('VOID_WITH_PAYMENTS')) return 'This invoice has payments recorded, so it cannot be voided. Delete the payments first.';
   if (msg.includes('AMOUNT_BELOW_PAID')) return 'The invoice amount cannot be less than what has already been paid.';
+  if (msg.includes('AGREEMENT_LOCKED')) return 'This agreement was already sent, so it can’t be changed. Void it and generate a new one.';
+  if (msg.includes('AGREEMENT_SIGN_VIA_LINK') || msg.includes('AGREEMENT_SIGNED_FINAL')) return 'Only the brand can sign, from your link. A signed agreement can’t be changed.';
   if (any?.code === '23505') return 'A record with that name or number already exists.';
   if (any?.code === '42501' || any?.code === 'PGRST301') return 'You do not have access to that record.';
   if (any?.code === '23503') return 'That record is linked to something that no longer exists.';

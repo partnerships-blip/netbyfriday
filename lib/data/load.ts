@@ -3,7 +3,7 @@ import { cache } from 'react';
 import { requireWorkspace, isDemo, todayIn } from '../auth';
 import { compute } from '../finance/core.js';
 import { demoData } from '../demo/fixture';
-import type { CoreInput, Profile, Brand, Deal, Contact, Task, Contract } from '../types';
+import type { CoreInput, Profile, Brand, Deal, Contact, Task, Contract, Agreement } from '../types';
 import { flag } from '../flags';
 
 function must<T>(r: { data: T | null; error: unknown }): T {
@@ -24,15 +24,16 @@ export const loadApp = cache(async () => {
   const brand: Brand = { name: ws.brand_name, accent: ws.accent, headlineFont: ws.headline_font, logoUrl };
   const realProfileRow = must<any>(await sb.from('creator_profiles').select('*').eq('workspace_id', ws.id).single());
   const realProfile = mapProfile(realProfileRow);
+  const agreementsOn = flag('agreements') || !!admin;
 
   if (isDemo()) {
     const d = demoData();
     const demoBrands = Array.from(new Map(d.input.deals.map(x => [x.brandId, { id: x.brandId, name: x.brandName }])).values());
-    return { brandList: demoBrands, user, ws, brand, prefs, isAdmin: !!admin, demo: true, contracts: d.contracts, invoiceSettings: { taxSetAsidePct: 25, paymentDetails: d.paymentDetails, email: '' }, readOnly: true, profile: d.profile, realProfile, input: d.input, metrics: compute(d.input), readKeys: [] as string[], checklistDone: [] as string[], advisorHistory: [] as any[] };
+    return { brandList: demoBrands, user, ws, brand, prefs, isAdmin: !!admin, demo: true, contracts: d.contracts, agreements: [] as Agreement[], agreementsOn, invoiceSettings: { taxSetAsidePct: 25, paymentDetails: d.paymentDetails, email: '' }, readOnly: true, profile: d.profile, realProfile, input: d.input, metrics: compute(d.input), readKeys: [] as string[], checklistDone: [] as string[], advisorHistory: [] as any[] };
   }
 
   const w = ws.id;
-  const [brands, deals, dels, invoices, payments, income, expenses, opps, aud, cats, atts, reads, checks, history, contacts, tasks, contracts] = await Promise.all([
+  const [brands, deals, dels, invoices, payments, income, expenses, opps, aud, cats, atts, reads, checks, history, contacts, tasks, contracts, agreements] = await Promise.all([
     sb.from('brands').select('id,name').eq('workspace_id', w),
     sb.from('deals').select('*').eq('workspace_id', w).order('started_on', { ascending: false }),
     sb.from('deliverables').select('*').eq('workspace_id', w).order('due_on'),
@@ -49,7 +50,9 @@ export const loadApp = cache(async () => {
     sb.from('advisor_messages').select('id,role,content,payload,created_at').eq('workspace_id', w).eq('user_id', user.id).order('created_at').limit(60),
     sb.from('contacts').select('*').eq('workspace_id', w).order('name'),
     sb.from('tasks').select('*').eq('workspace_id', w).order('created_at', { ascending: false }),
-    flag('contracts') ? sb.from('contracts').select('*').eq('workspace_id', w).order('created_at', { ascending: false }) : Promise.resolve({ data: [], error: null })
+    flag('contracts') ? sb.from('contracts').select('*').eq('workspace_id', w).order('created_at', { ascending: false }) : Promise.resolve({ data: [], error: null }),
+    // Tolerant of a deploy that lands before the agreements migration: the rest of the app keeps working.
+    agreementsOn ? sb.from('agreements').select('*').eq('workspace_id', w).order('updated_at', { ascending: false }).then((r: any) => (r.error ? (console.error('[agreements] load', r.error.code), { data: [], error: null }) : r)) : Promise.resolve({ data: [], error: null })
   ]);
   const brandName = new Map(must<any[]>(brands).map(b => [b.id, b.name]));
   const delRows = must<any[]>(dels), attRows = must<any[]>(atts);
@@ -80,12 +83,20 @@ export const loadApp = cache(async () => {
   return {
     brandList: must<any[]>(brands).map(b => ({ id: b.id as string, name: b.name as string })),
     user, ws, brand, prefs, isAdmin: !!admin, demo: false, readOnly: false, profile: realProfile, realProfile, input, metrics: compute(input),
-    contracts: must<any[]>(contracts).map(mapContract),
+    contracts: must<any[]>(contracts).map(mapContract), agreements: must<any[]>(agreements).map(mapAgreement), agreementsOn,
     invoiceSettings: { taxSetAsidePct: Number(ws.tax_set_aside_pct ?? 25), paymentDetails: ws.invoice_payment_details ?? '', email: ws.invoice_email ?? '' },
     readKeys: must<any[]>(reads).map(r => r.key), checklistDone: must<any[]>(checks).filter(c => c.done_on === today).map(c => c.key),
     advisorHistory: must<any[]>(history)
   };
 });
+
+export function mapAgreement(a: any): Agreement {
+  return { id: a.id, dealId: a.deal_id, status: a.status, title: a.title, sourceText: a.source_text, extracted: a.extracted && Object.keys(a.extracted).length ? a.extracted : null,
+    terms: a.terms ?? {}, body: a.body, bodySha256: a.body_sha256, shareToken: a.share_token, creatorName: a.creator_name, creatorEmail: a.creator_email,
+    creatorSignature: a.creator_signature, creatorSignedAt: a.creator_signed_at, sentAt: a.sent_at, firstViewedAt: a.first_viewed_at,
+    signerName: a.signer_name, signerTitle: a.signer_title, signerEmail: a.signer_email, signerSignature: a.signer_signature, signedAt: a.signed_at, voidedAt: a.voided_at,
+    audit: Array.isArray(a.audit) ? a.audit : [], createdAt: a.created_at, updatedAt: a.updated_at };
+}
 
 export function mapContract(c: any): Contract {
   return { id: c.id, dealId: c.deal_id, status: c.status, title: c.title, fileName: c.file_name, hasFile: !!c.storage_path, brandName: c.brand_name,

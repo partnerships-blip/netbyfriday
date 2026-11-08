@@ -8,7 +8,7 @@ export interface AIProvider {
   /** Same call, plus why the model stopped ('max_tokens' means the answer was cut off). */
   completeWithMeta(opts: { system: string; messages: ChatMessage[]; maxTokens: number }): Promise<Completion>;
   /** One user turn that carries a document (a PDF, or plain text) plus an instruction. PDFs need a provider that reads them. */
-  readDocument(opts: { system: string; instruction: string; pdfBase64?: string; text?: string; maxTokens: number }): Promise<Completion>;
+  readDocument(opts: { system: string; instruction: string; pdfBase64?: string; text?: string; image?: { base64: string; mediaType: string }; maxTokens: number }): Promise<Completion>;
 }
 export class AIUnavailable extends Error {}
 
@@ -30,8 +30,9 @@ function anthropic(): AIProvider {
       const j = await res.json();
       return { text: (j.content ?? []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('').trim(), stopReason: j.stop_reason ?? null };
     },
-    async readDocument({ system, instruction, pdfBase64, text, maxTokens }) {
-      const doc = pdfBase64
+    async readDocument({ system, instruction, pdfBase64, text, image, maxTokens }) {
+      const doc = image ? { type: 'image', source: { type: 'base64', media_type: image.mediaType, data: image.base64 } }
+        : pdfBase64
         ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdfBase64 } }
         : { type: 'document', source: { type: 'text', media_type: 'text/plain', data: text ?? '' } };
       const res = await fetch((process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com').replace(/\/$/, '') + '/v1/messages', {
@@ -64,8 +65,9 @@ function openaiCompatible(): AIProvider {
       const finish = j.choices?.[0]?.finish_reason ?? null;
       return { text: String(j.choices?.[0]?.message?.content ?? '').trim(), stopReason: finish === 'length' ? 'max_tokens' : finish };
     },
-    async readDocument({ system, instruction, pdfBase64, text, maxTokens }) {
+    async readDocument({ system, instruction, pdfBase64, text, image, maxTokens }) {
       if (pdfBase64) throw new AIUnavailable('Reading PDFs needs the Anthropic provider. Paste the contract text instead.');
+      if (image) return this.completeWithMeta({ system, maxTokens, messages: [{ role: 'user', content: [{ type: 'image_url', image_url: { url: `data:${image.mediaType};base64,${image.base64}` } }, { type: 'text', text: instruction }] as any }] });
       return this.completeWithMeta({ system, messages: [{ role: 'user', content: `<document>\n${text ?? ''}\n</document>\n\n${instruction}` }], maxTokens });
     }
   };

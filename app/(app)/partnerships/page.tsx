@@ -14,7 +14,8 @@ export default async function PartnershipsPage({ searchParams }: { searchParams:
     <>
       <PageHeader title="Partnerships" sub="Every brand deal from first inquiry to final payment." />
       <ReadOnlyNote show={app.readOnly} />
-      <Board deals={deals} invoices={invoices} received={m.receivedByDeal} summary={summary} initialDeal={searchParams.deal ?? null} readOnly={app.readOnly} today={m.today} contacts={app.input.contacts ?? []} tasks={app.input.tasks ?? []} contracts={flag('contracts') ? app.contracts ?? [] : []} />
+      <Board deals={deals} invoices={invoices} received={m.receivedByDeal} summary={summary} initialDeal={searchParams.deal ?? null} readOnly={app.readOnly} today={m.today} contacts={app.input.contacts ?? []} tasks={app.input.tasks ?? []} contracts={flag('contracts') ? app.contracts ?? [] : []}
+        agreements={app.agreementsOn && !app.readOnly ? app.agreements.map(a => ({ id: a.id, dealId: a.dealId, title: a.title, status: a.status })) : null} />
     </>
   );
 }

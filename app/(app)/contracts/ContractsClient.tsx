@@ -9,6 +9,8 @@ import { formatCents, shortDate } from '@/lib/finance/core.js';
 import type { Contract } from '@/lib/types';
 
 type Row = Contract & { dealLabel: string | null };
+type AgreementRow = { id: string; title: string; status: 'draft' | 'sent' | 'signed' | 'void'; brandName: string; updatedAt: string; dealLabel: string | null };
+const AGR: Record<AgreementRow['status'], { label: string; tone: 'neutral' | 'warn' | 'ok' }> = { draft: { label: 'Draft', tone: 'neutral' }, sent: { label: 'Waiting for signature', tone: 'warn' }, signed: { label: 'Signed', tone: 'ok' }, void: { label: 'Void', tone: 'neutral' } };
 type Window = { contractId: string; title: string; brandName: string; kind: 'usage' | 'exclusivity'; text: string; startsOn: string | null; endsOn: string | null; daysLeft: number | null; state: string };
 
 const STATE: Record<string, { label: (w: Window) => string; tone: 'warn' | 'ok' | 'neutral' | 'accent' }> = {
@@ -16,7 +18,7 @@ const STATE: Record<string, { label: (w: Window) => string; tone: 'warn' | 'ok' 
   upcoming: { label: w => `Starts ${shortDate(w.startsOn)}`, tone: 'accent' }, open: { label: () => 'No end date', tone: 'neutral' }, ended: { label: w => `Ended ${shortDate(w.endsOn)}`, tone: 'neutral' }
 };
 
-export function ContractsClient({ contracts, windows, today, readOnly }: { contracts: Row[]; windows: Window[]; today: string; readOnly: boolean }) {
+export function ContractsClient({ contracts, windows, today, readOnly, agreementsOn = false, agreements = [] }: { contracts: Row[]; windows: Window[]; today: string; readOnly: boolean; agreementsOn?: boolean; agreements?: AgreementRow[] }) {
   const router = useRouter();
   const [mode, setMode] = useState<'file' | 'paste'>('file');
   const [text, setText] = useState('');
@@ -49,10 +51,27 @@ export function ContractsClient({ contracts, windows, today, readOnly }: { contr
 
   return (
     <>
+      {agreementsOn && !readOnly && (
+        <Card className="flex flex-wrap items-center gap-4 border-ink/15 bg-[#F3FFC4] p-5">
+          <span className="flex min-w-0 flex-1 flex-col gap-1"><span className="font-head text-[24px] leading-tight">No contract yet? Generate one.</span>
+            <span className="text-[14px] text-sub">Paste the brand’s email or DM, or upload a screenshot. You get a plain-English agreement with your terms, ready to sign and send.</span></span>
+          <Link href="/agreements/new" className="inline-flex h-11 items-center rounded-[12px] bg-ink px-5 text-[14px] font-semibold text-white">Generate a contract</Link>
+        </Card>
+      )}
+      {agreementsOn && agreements.length > 0 && (
+        <Card className="flex flex-col gap-1 px-5 py-[18px]">
+          <div className="mb-1 flex items-baseline justify-between gap-3"><Eyebrow>Agreements you generated</Eyebrow><span className="text-xs text-muted">Signed with netbyfriday</span></div>
+          {agreements.map(a => (
+            <Link key={a.id} href={`/agreements/${a.id}`} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-t border-soft2 py-2.5 text-sm first:border-0 hover:bg-bg">
+              <span className="min-w-0"><span className="block truncate font-medium">{a.title}</span><span className="block truncate text-xs text-sub">{[a.brandName, a.dealLabel ?? 'Not linked to a partnership'].filter(Boolean).join(' · ')}</span></span>
+              <Pill tone={AGR[a.status].tone}>{AGR[a.status].label}</Pill>
+            </Link>))}
+        </Card>
+      )}
       {!readOnly && (
         <Card className="flex flex-col gap-4 p-5">
           <div className="flex flex-wrap items-center gap-3">
-            <h2 className="mr-auto font-head text-[26px]">Add a contract</h2>
+            <h2 className="mr-auto font-head text-[26px]">{agreementsOn ? 'Add a contract you received' : 'Add a contract'}</h2>
             <div className="flex gap-1 rounded-[10px] bg-bg p-[3px]" role="tablist">
               {(['file', 'paste'] as const).map(m => <button key={m} role="tab" aria-selected={mode === m} onClick={() => setMode(m)} className={cx('h-[30px] rounded-lg px-3 text-[13px]', mode === m ? 'bg-white font-semibold' : '')}>{m === 'file' ? 'Upload PDF' : 'Paste text'}</button>)}
             </div>

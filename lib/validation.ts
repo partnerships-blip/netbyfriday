@@ -130,3 +130,34 @@ export const ContractSchema = z.object({
 export const TaxSettingsSchema = z.object({ pct: z.coerce.number().int('Use a whole percentage.').min(0).max(60, 'Use 60% or less.') });
 export const InvoiceSettingsSchema = z.object({ paymentDetails: text(1000).default(''), email });
 export const ShareInvoiceSchema = z.object({ id: uuid, billToEmail: email.default('') });
+
+// ---------- generated agreements (flag: agreements) ----------
+const optDays = z.union([z.literal(''), z.coerce.number().int('Use whole days.').min(1).max(3650)]).default('').transform(v => (v === '' ? '' : String(v)));
+const optDateStr = z.union([z.literal(''), isoDate]).default('');
+/** The creator's edited terms. The fee stays a normalized dollar string ("4200.00"); the template parses it with the engine. */
+export const AgreementTermsSchema = z.object({
+  creatorName: text(120).default(''), creatorEmail: z.union([z.literal(''), z.string().trim().email('Use a valid email.').max(200)]).default(''),
+  brandName: text(160).default(''), brandSignerName: text(120).default(''),
+  brandSignerEmail: z.union([z.literal(''), z.string().trim().email('Use a valid email for the brand signer.').max(200)]).default(''),
+  campaign: text(200).default(''),
+  fee: z.union([z.string(), z.number()]).default('').transform((v, ctx) => {
+    const s = String(v).trim();
+    if (s === '') return '';
+    const c = parseMoneyToCents(s);
+    if (c === null) { ctx.addIssue({ code: 'custom', message: 'Fee must be an amount like 4200 or 4,200.00.' }); return z.NEVER; }
+    return (c / 100).toFixed(2);
+  }),
+  paymentTerms: text(300).default(''),
+  deliverables: z.array(z.object({ name: text(200).default(''), dueOn: optDateStr })).max(20, 'Up to 20 deliverables.').default([])
+    .transform(ds => ds.filter(d => d.name)),
+  usageRights: text(1000).default(''), usageDays: optDays,
+  exclusivity: text(1000).default(''), exclusivityDays: optDays,
+  whitelisting: text(500).default(''), revisions: text(200).default(''), approval: text(300).default(''),
+  killFee: text(500).default(''), otherTerms: text(3000).default(''), governingLaw: text(80).default('')
+});
+export const AgreementSaveSchema = z.object({ id: uuid, dealId: z.union([uuid, z.literal(''), z.null()]).default('').transform(v => v || null), terms: AgreementTermsSchema });
+export const AgreementSendSchema = z.object({
+  id: uuid,
+  signature: z.string().trim().min(2, 'Type your full name to sign.').max(120),
+  consent: z.literal(true, { errorMap: () => ({ message: 'Agree to sign electronically to send it.' }) })
+});

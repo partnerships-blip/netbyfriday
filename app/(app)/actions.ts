@@ -2,7 +2,10 @@
 // All mutations. Each one: authenticate → refuse in demo mode → validate with zod → write under RLS → revalidate.
 // workspace_id is always taken from the server session, never from the client.
 import { revalidatePath } from 'next/cache';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
+import { createHash, randomUUID } from 'node:crypto';
+import { agreementsAllowed } from '@/lib/agreements/access';
+import { renderAgreement, agreementText, agreementTitle, missingRequired } from '@/lib/agreements/template';
 import { requireWritable, requireWorkspace, friendlyError, todayIn, UserError } from '@/lib/auth';
 import * as S from '@/lib/validation';
 import { track } from '@/lib/analytics';
@@ -457,6 +460,74 @@ export async function deleteContract(id: string) {
     ok(await c.sb.from('contracts').delete().eq('id', id).eq('workspace_id', c.ws.id));
     if (cur.storage_path) await c.sb.storage.from('attachments').remove([cur.storage_path]);
   }, 'Contract deleted');
+}
+
+// ---------- generated agreements (flag: agreements; beta admins before that) ----------
+// The creator edits a draft, then signs and sends it. Sending freezes the text (and its SHA-256), creates a private link,
+// and records the creator's signature. The brand signs only through sign_agreement(). netbyfriday sends no email.
+async function agreementCtx(c: Ctx) { if (!(await agreementsAllowed(c.sb, c.user.id))) throw new UserError('The contract generator is not available yet.'); }
+const clientIp = () => (headers().get('x-forwarded-for') ?? '').split(',')[0].trim().slice(0, 64);
+const nowIso = () => new Date().toISOString();
+
+export async function saveAgreement(raw: unknown) {
+  return run(async c => {
+    await agreementCtx(c);
+    const v = S.AgreementSaveSchema.parse(raw);
+    const cur = ok(await c.sb.from('agreements').select('id,status').eq('id', v.id).eq('workspace_id', c.ws.id).single());
+    if (cur.status !== 'draft') throw new UserError('This agreement was already sent, so its terms can’t change. Void it and generate a new one.');
+    ok(await c.sb.from('agreements').update({ terms: v.terms, title: agreementTitle(v.terms).slice(0, 200), deal_id: v.dealId }).eq('id', v.id).eq('workspace_id', c.ws.id).select('id').single());
+    return v.id;
+  }, 'Draft saved');
+}
+
+export async function sendAgreement(raw: unknown) {
+  return run(async c => {
+    await agreementCtx(c);
+    const v = S.AgreementSendSchema.parse(raw);
+    const cur = ok(await c.sb.from('agreements').select('id,status,terms,audit').eq('id', v.id).eq('workspace_id', c.ws.id).single());
+    if (cur.status !== 'draft') throw new UserError('This agreement was already sent.');
+    const terms = S.AgreementTermsSchema.parse(cur.terms ?? {});
+    const missing = missingRequired(terms);
+    if (missing.length) throw new UserError(`Add these before sending: ${missing.join(', ')}.`);
+    if (v.signature.toLowerCase() !== terms.creatorName.trim().toLowerCase()) throw new UserError(`Type your name exactly as it appears in the agreement (${terms.creatorName}) to sign.`);
+    const body = agreementText(renderAgreement(terms));
+    const at = nowIso(), ip = clientIp();
+    ok(await c.sb.from('agreements').update({
+      status: 'sent', body, body_sha256: createHash('sha256').update(body, 'utf8').digest('hex'), share_token: randomUUID(), sent_at: at,
+      creator_name: terms.creatorName, creator_email: terms.creatorEmail, creator_signature: v.signature, creator_signed_at: at, creator_ip: ip,
+      audit: [...(Array.isArray(cur.audit) ? cur.audit : []), { event: 'consented', at, by: terms.creatorName }, { event: 'creator_signed', at, by: terms.creatorName, ip }, { event: 'link_created', at }]
+    }).eq('id', v.id).eq('workspace_id', c.ws.id).select('id').single());
+    return v.id;
+  }, 'Signed. Your private link is ready to send.');
+}
+
+export async function voidAgreement(id: string) {
+  return run(async c => {
+    await agreementCtx(c);
+    const cur = ok(await c.sb.from('agreements').select('id,status,audit').eq('id', S.uuid.parse(id)).eq('workspace_id', c.ws.id).single());
+    if (cur.status === 'signed') throw new UserError('A signed agreement can’t be voided here. Agree any change with the brand in a new agreement.');
+    if (cur.status !== 'sent') throw new UserError('Only a sent agreement can be voided.');
+    ok(await c.sb.from('agreements').update({ status: 'void', share_token: null, voided_at: nowIso(), audit: [...(cur.audit ?? []), { event: 'voided', at: nowIso() }] })
+      .eq('id', id).eq('workspace_id', c.ws.id).select('id').single());
+  }, 'Agreement voided. The link no longer works.');
+}
+
+export async function deleteAgreement(id: string) {
+  return run(async c => {
+    await agreementCtx(c);
+    const cur = ok(await c.sb.from('agreements').select('status').eq('id', S.uuid.parse(id)).eq('workspace_id', c.ws.id).single());
+    if (cur.status === 'sent' || cur.status === 'signed') throw new UserError(cur.status === 'signed' ? 'Signed agreements are kept as a record.' : 'Void the agreement first, then delete it.');
+    ok(await c.sb.from('agreements').delete().eq('id', id).eq('workspace_id', c.ws.id));
+  }, 'Agreement deleted');
+}
+
+export async function linkAgreement(raw: unknown) {
+  return run(async c => {
+    await agreementCtx(c);
+    const v = S.ContractLinkSchema.parse(raw);
+    ok(await c.sb.from('agreements').update({ deal_id: v.dealId }).eq('id', v.contractId).eq('workspace_id', c.ws.id).select('id').single());
+    return v.contractId;
+  }, 'Partnership updated');
 }
 
 // ---------- taxes (flag: taxes) ----------

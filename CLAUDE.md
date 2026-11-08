@@ -36,4 +36,5 @@ Milestones 1–4 are complete; staging is https://netbyfriday-x566.vercel.app (d
 - After any Advisor prompt or model change, run the "Advisor evaluation" GitHub workflow against staging. It must keep 0 wrong-verified and at least 18/20.
 - Public site figures come only from `lib/marketing/sample.ts` (engine + demo fixture). Never hand-type numbers on the site.
 - Contracts (AI-read terms, creator confirms), Taxes (cash-basis set-aside) and sendable invoices (private link + creator's own email app) are live: `docs/CONTRACTS_TAXES_INVOICES.md`. Contract reading follows the Advisor rules: proposals only, money parsed by the engine, Confirm runs normal server actions.
+- Contract generator + e-signing (flag `agreements`, on for beta admins only until the template's legal review): `docs/AGREEMENTS.md`. The AI proposes terms only; the contract text is the fixed template in `lib/agreements/template.ts`; signing only through `sign_agreement()`; netbyfriday sends no email.
 - Next is M5 (Stripe), only when the founder starts the paid beta; otherwise M6 launch prep (`docs/MVP_PLAN.md` §6).
