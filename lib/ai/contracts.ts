@@ -61,6 +61,7 @@ export function parseExtraction(raw: string, source: 'pdf' | 'text' | 'image', s
     if (k.endsWith('On') && !date.safeParse(value).success) { out.warnings.push(`Ignored an unclear date for ${label(k)}.`); continue; }
     if (k.endsWith('Days')) { const n = Number(value); if (!Number.isInteger(n) || n <= 0 || n > 3650) { out.warnings.push(`Ignored an unclear length for ${label(k)}.`); continue; } value = String(n); }
     if (k === 'fee' && parseMoneyToCents(value.replace(/[^\d.,]/g, '')) === null) { out.warnings.push('The fee could not be read as an amount. Check it in the contract.'); continue; }
+    if (k === 'fee' && /\b(per|each|every|a|an)\s+(month|week|post|piece|asset|reel|story|video|deliverable)|\/\s*(mo|month|wk|week|post)\b|\b(monthly|weekly)\b/i.test(value)) { out.warnings.push(`The fee was written as a rate (“${value.slice(0, 80)}”), not a total. Enter the total fee yourself.`); continue; }
     const field: ExtractedField = { value, quote: f.data.quote, found: found(f.data.quote) };
     out.fields[k] = field;
   }
@@ -73,6 +74,7 @@ export function parseExtraction(raw: string, source: 'pdf' | 'text' | 'image', s
   }
   out.warnings.push(...r.data.warnings.map(w => String(w).trim().slice(0, 300)).filter(Boolean).slice(0, 8));
   const missing = Object.entries(out.fields).filter(([, f]) => f.found === false).map(([k]) => label(k as Key));
+  if (!out.deliverables.length && source !== 'pdf') out.warnings.push('No deliverables were found. Add each piece of content before sending.');
   if (missing.length) out.warnings.push(`Couldn’t find the quoted wording for: ${missing.join(', ')}. Double-check these against the contract.`);
   return out;
 }

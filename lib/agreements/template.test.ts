@@ -70,3 +70,23 @@ describe('agreement validation', () => {
     expect(AgreementSendSchema.parse({ id, signature: 'Casey Test', consent: true }).signature).toBe('Casey Test');
   });
 });
+
+describe('reading a long email thread', () => {
+  it('never turns a monthly rate into the total fee, and flags a missing deliverables list', async () => {
+    const { parseExtraction } = await import('../ai/contracts');
+    const thread = 'The monthly partnership rate would remain at $3,000. We would love 2 of the 4 monthly Story posts to be photo-based.';
+    const x = parseExtraction(JSON.stringify({ fields: { fee: { value: '$3,000 monthly', quote: 'The monthly partnership rate would remain at $3,000' } }, deliverables: [] }), 'text', thread);
+    expect(x.fields.fee).toBeUndefined();
+    expect(x.warnings.some(w => w.includes('written as a rate'))).toBe(true);
+    expect(x.warnings).toContain('No deliverables were found. Add each piece of content before sending.');
+    const ok = parseExtraction(JSON.stringify({ fields: { fee: { value: '$6,000', quote: 'x' } }, deliverables: [{ name: '4 Instagram Stories (November), 2 photo-based', dueOn: null, quote: 'the 4 monthly Story posts' }] }), 'text', thread);
+    expect(ok.fields.fee?.value).toBe('$6,000');
+    expect(ok.deliverables[0]).toMatchObject({ name: '4 Instagram Stories (November), 2 photo-based', found: true });
+    expect(ok.warnings).not.toContain('No deliverables were found. Add each piece of content before sending.');
+  });
+  it('tells the AI to keep deliverables that have no exact count', async () => {
+    const { AGREEMENT_SYSTEM } = await import('../ai/agreements');
+    expect(AGREEMENT_SYSTEM).toContain('(number not stated)');
+    expect(AGREEMENT_SYSTEM).toContain('latest version both sides accepted');
+  });
+});

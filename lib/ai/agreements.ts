@@ -20,8 +20,15 @@ Keys you may use in "fields" (omit any the message does not state):
 - revisions: number of revision rounds
 - killFee: what happens to the fee if the brand cancels
 - otherTerms: anything else agreed that a creator must not miss (approval windows, product shipping, talking points), briefly
-Deliverables: one entry per piece of content, named like "1 Instagram Reel" or "3 Instagram Stories", with dueOn only when a calendar date is written.
+Email threads: read the whole thread, oldest to newest, including the creator's own replies. Earlier offers can be changed later in the thread; use the latest version both sides accepted, and quote the message where it was agreed. Ignore signatures, sign-offs, links and quoted reviews or testimonials.
+Deliverables: list every piece of content the parties agreed the creator will make or publish, even when it is described loosely, spread across several messages, or has no exact count.
+- Name each like "1 Instagram Reel" or "4 Instagram Stories". When a count is per month or per week and the length of the deal is stated, add one entry per period, e.g. "4 Instagram Stories (November)" and "4 Instagram Stories (December)".
+- When the type is agreed but no count is written anywhere, still add it with "(number not stated)", e.g. "Instagram Reels (number not stated)", and add a warning asking the creator to fill in the count.
+- Put agreed details about a deliverable in its name, briefly (e.g. "published as an Instagram Collab post", "2 of 4 photo-based"), and anything agreed about all of them in otherTerms (cross-posting, Highlights, how long posts stay up).
+- Leave out deliverables that were offered and then removed, and say so in a warning.
+- dueOn only when a calendar date is written for that piece.
+Fee: the total fee as written. If only a rate per month or per piece is written, give that wording as written in "fee" and add a warning that the total must be checked; never multiply.
 Rules: every "quote" must be copied word for word from the message (at most 300 characters). Never guess or fill in typical terms.
-If a term is still being negotiated or is ambiguous, leave it out and add a short warning. Keep values short and plain.`;
+If a term was never settled by the end of the thread, leave it out and add a short warning. Keep values short and plain.`;
 
 export const AGREEMENT_INSTRUCTION = 'Extract the deal terms discussed in this message as JSON.';
