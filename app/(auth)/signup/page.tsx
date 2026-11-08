@@ -20,6 +20,7 @@ export default function SignUpPage() {
           <Field label="Password"><Input name="password" type="password" autoComplete="new-password" minLength={10} placeholder="At least 10 characters" required /></Field>
           {state.error && <p role="alert" className="text-sm text-danger">{state.error}</p>}
           <Submit />
+          <p className="text-xs leading-relaxed text-muted">By creating an account, you confirm you’re 18 or older and agree to the <Link href="/terms" className="text-ink underline underline-offset-2">Terms and Conditions</Link> and <Link href="/privacy" className="text-ink underline underline-offset-2">Privacy Policy</Link>.</p>
         </form>
       )}
       <p className="text-sm text-muted">Already have an account? <Link href="/login" className="text-ink underline underline-offset-2">Sign in</Link> · No invite yet? <Link href="/waitlist" className="text-ink underline underline-offset-2">Join the waitlist</Link></p>

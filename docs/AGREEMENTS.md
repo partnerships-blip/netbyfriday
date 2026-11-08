@@ -7,7 +7,7 @@ A creator pastes a brand email, DM or notes (or uploads a screenshot). netbyfrid
 ## Still to do (founder)
 
 1. **Have a lawyer review the template** in `lib/agreements/template.ts`: every section's wording, the fallbacks used when a term is missing (usage rights, kill fee, exclusivity), and the consent wording on the signing page (`app/sign/[token]/SignForm.tsx`) and in the creator's sign step. Change the template's text there; tests in `lib/agreements/template.test.ts` show what each section produces.
-2. **Update the Terms of Service** to cover the generator and e-signing, including that netbyfriday is not a party to the agreements and doesn't give legal advice.
+2. ~~Update the Terms~~ Done 2026-11-08: `/terms` §5 covers the generator and e-signing (not a party, not legal advice, no identity check); `/privacy` covers signer data and the audit trail. Both still need the lawyer's review.
 It was turned on before the legal review. Until the review is done, treat the template as a starting point and update its wording as the lawyer advises.
 
 ## How it stays inside the rules
