@@ -14,7 +14,8 @@
     "db:reset": "supabase db reset",
     "db:test": "supabase test db",
     "db:types": "supabase gen types typescript --local > lib/supabase/database.types.ts",
-    "check:overlap": "node scripts/overlap-check.mjs"
+    "check:overlap": "node scripts/overlap-check.mjs",
+    "eval:contracts": "vitest run -c vitest.eval.config.ts"
   },
   "dependencies": {
     "@fontsource-variable/plus-jakarta-sans": "^5.3.0",

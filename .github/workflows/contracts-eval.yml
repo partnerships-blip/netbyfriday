@@ -1,0 +1,37 @@
+# Contract reading + contract generator evaluation against the REAL AI provider (same prompts, parser and money engine as the app).
+# Runs by hand, and on every push that changes the prompts or the code that turns AI output into terms.
+# Needs repository secrets ANTHROPIC_API_KEY and AI_MODEL (docs/AI_EVALS.md). Results appear in the run summary.
+name: Contracts evaluation
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['lib/ai/contracts.ts', 'lib/ai/agreements.ts', 'lib/ai/provider.ts', 'lib/agreements/**', 'tests/eval/**', 'vitest.eval.config.ts']
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    env:
+      E2E_REAL_AI: '1'
+      AI_PROVIDER: anthropic
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      AI_MODEL: ${{ secrets.AI_MODEL }}
+    steps:
+      - name: Check the AI key is set
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ] || [ -z "$AI_MODEL" ]; then
+            echo "Add the ANTHROPIC_API_KEY and AI_MODEL repository secrets to run this evaluation (docs/AI_EVALS.md)." >> "$GITHUB_STEP_SUMMARY"
+            if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then echo "::error::ANTHROPIC_API_KEY / AI_MODEL secrets are missing"; exit 1; fi
+            echo "::notice::Skipped: ANTHROPIC_API_KEY / AI_MODEL secrets are missing"; echo "SKIP=1" >> "$GITHUB_ENV"
+          fi
+      - if: env.SKIP != '1'
+        uses: actions/checkout@v4
+      - if: env.SKIP != '1'
+        uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - if: env.SKIP != '1'
+        run: npm ci
+      - if: env.SKIP != '1'
+        run: npm run eval:contracts
+      - if: always() && env.SKIP != '1'
+        uses: actions/upload-artifact@v4
+        with: { name: contracts-eval, path: test-results/contracts-eval.md, retention-days: 30 }
