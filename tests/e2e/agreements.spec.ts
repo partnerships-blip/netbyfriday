@@ -97,4 +97,14 @@ test('generate a contract from a DM, sign and send it, and the brand signs from 
   await page.waitForURL(/\/agreements\/[0-9a-f-]{36}$/);
   await expect(page.getByText('Read from a screenshot. Check each term against the original message.', { exact: false })).toBeVisible();
   await expect(page.getByLabel('Brand', { exact: true })).toHaveValue('Petalwear');
+
+  // A long email thread (3x the old 20,000-character limit) goes through and is kept on the draft.
+  const filler = '\n\n---\nOn Tue, a teammate wrote:\n> Looping in finance and legal for visibility. Thanks all!\n'.repeat(700);
+  const longThread = DM + filler;
+  expect(longThread.length).toBeGreaterThan(60_000);
+  await page.goto('/agreements/new');
+  await page.getByLabel('Message text').fill(longThread);
+  await page.getByRole('button', { name: 'Generate contract' }).click();
+  await page.waitForURL(/\/agreements\/[0-9a-f-]{36}$/);
+  await expect(page.getByLabel('Brand', { exact: true })).toHaveValue('Petalwear');
 });

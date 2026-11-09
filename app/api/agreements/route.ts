@@ -11,7 +11,9 @@ import type { ContractExtraction } from '@/lib/types';
 
 const MAX_IMAGE = 5 * 1024 * 1024;
 const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
-export const maxDuration = 90;
+export const maxDuration = 120;
+/** Long email threads fit: about 50 pages. Same limit as a pasted contract; the database allows the same. */
+const MAX_MESSAGE = 200_000;
 
 /**
  * Generate a draft agreement from a brand email, note or DM (pasted text) or a screenshot of one.
@@ -30,7 +32,7 @@ export async function POST(req: Request) {
       if (file.size > MAX_IMAGE) throw new UserError('Screenshots must be under 5 MB.');
       image = { base64: Buffer.from(await file.arrayBuffer()).toString('base64'), mediaType: file.type };
     } else if (pasted) {
-      if (pasted.length > 20_000) throw new UserError('That message is too long. Paste just the part about the deal.');
+      if (pasted.length > MAX_MESSAGE) throw new UserError('That thread is over 200,000 characters (about 50 pages). Paste the messages about this deal.');
       text = pasted;
     } else throw new UserError('Paste the message, or upload a screenshot of it.');
 
