@@ -56,7 +56,7 @@ export async function POST(req: Request) {
       extraction = { source: pdfBase64 ? 'pdf' : 'text', fields: {}, deliverables: [], warnings: ['You have reached the hourly AI limit, so this one wasn’t read automatically. Fill in the terms by hand, or try again later.'] };
     } else {
       try {
-        const out = await getProvider().readDocument({ system: CONTRACT_SYSTEM, instruction: CONTRACT_INSTRUCTION, pdfBase64, text, maxTokens: 3000 });
+        const out = await getProvider().readDocument({ system: CONTRACT_SYSTEM, instruction: CONTRACT_INSTRUCTION, pdfBase64, text, maxTokens: 6000 });
         extraction = parseExtraction(out.text, pdfBase64 ? 'pdf' : 'text', text);
         if (out.stopReason === 'max_tokens') extraction.warnings.push('The contract is long; some terms may be missing. Check the full document.');
       } catch (e) {

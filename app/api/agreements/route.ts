@@ -54,7 +54,7 @@ export async function POST(req: Request) {
       extraction = { source, fields: {}, deliverables: [], warnings: ['You have reached the hourly AI limit, so this one wasn’t read automatically. Fill in the terms by hand, or try again later.'] };
     } else {
       try {
-        const out = await getProvider().readDocument({ system: AGREEMENT_SYSTEM, instruction: AGREEMENT_INSTRUCTION, text, image, maxTokens: 4000 });
+        const out = await getProvider().readDocument({ system: AGREEMENT_SYSTEM, instruction: AGREEMENT_INSTRUCTION, text, image, maxTokens: 8000 });
         extraction = parseExtraction(out.text, source, text);
         if (out.stopReason === 'max_tokens') extraction.warnings.push('The message was long, so the read may be incomplete. Check every term, especially deliverables.');
         if (!text) extraction.warnings.push('Read from a screenshot. Check each term against the original message.');

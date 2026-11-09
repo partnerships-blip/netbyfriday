@@ -8,7 +8,7 @@ import type { ContractExtraction, ExtractedField } from '../types';
 import { FLAG_IDS, FLAG_INFO, mergeFlags, scanText, type RedFlag, type FlagId } from '../contracts/redflags';
 
 export const FIELD_KEYS = ['title', 'campaign', 'contactName', 'contactEmail', 'brandName', 'fee', 'paymentTerms', 'signedOn', 'usageRights', 'usageDays', 'usageStartsOn', 'usageEndsOn',
-  'exclusivity', 'exclusivityDays', 'exclusivityStartsOn', 'exclusivityEndsOn', 'whitelisting', 'revisions', 'killFee', 'otherTerms'] as const;
+  'exclusivity', 'exclusivityDays', 'exclusivityStartsOn', 'exclusivityEndsOn', 'whitelisting', 'revisions', 'approval', 'killFee', 'otherTerms'] as const;
 type Key = typeof FIELD_KEYS[number];
 
 /** Shared by contract reading and the contract generator: clauses that commonly hurt creators. */
@@ -40,7 +40,12 @@ ${FLAGS_PROMPT}`;
 export const CONTRACT_INSTRUCTION = 'Extract the terms of this contract as JSON.';
 
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(s => !Number.isNaN(Date.parse(s + 'T00:00:00Z')));
-const Field = z.object({ value: z.union([z.string(), z.number()]).transform(v => String(v).trim().slice(0, 1000)), quote: z.string().default('').transform(s => s.trim().slice(0, 300)) });
+// A term agreed across several messages can come back as a list of values or quotes: keep it (joined), never drop it.
+const Text = z.union([z.string(), z.number(), z.array(z.union([z.string(), z.number()]))]);
+const Field = z.object({
+  value: Text.transform(v => (Array.isArray(v) ? v.map(String).map(x => x.trim()).filter(Boolean).join('; ') : String(v).trim()).slice(0, 1000)),
+  quote: Text.nullable().default('').transform(q => (Array.isArray(q) ? q.map(String) : [String(q ?? '')]).map(x => x.trim()).filter(Boolean))
+});
 const Raw = z.object({
   fields: z.record(z.string(), z.unknown()).default({}),
   deliverables: z.array(z.object({ name: z.string(), dueOn: z.string().nullable().optional(), quote: z.string().optional() })).default([]),
@@ -83,7 +88,9 @@ export function parseExtraction(raw: string, source: 'pdf' | 'text' | 'image', s
     }
     if (k === 'fee' && feeToCents(value) === null) { out.warnings.push('The fee could not be read as an amount. Check it in the contract.'); continue; }
     if (k === 'fee' && /\b(per|each|every|a|an)\s+(month|week|post|piece|asset|reel|story|video|deliverable)|\/\s*(mo|month|wk|week|post)\b|\b(monthly|weekly)\b/i.test(value)) { out.warnings.push(`The fee was written as a rate (“${value.slice(0, 80)}”), not a total. Enter the total fee yourself.`); continue; }
-    const field: ExtractedField = { value, quote: f.data.quote, found: found(f.data.quote) };
+    const quotes = f.data.quote.map(q => q.slice(0, 300));
+    const checks = quotes.map(found);
+    const field: ExtractedField = { value, quote: quotes.join(' … ').slice(0, 620), found: checks.length === 0 ? found('') : checks.includes(undefined) ? undefined : checks.every(Boolean) };
     out.fields[k] = field;
   }
   for (const d of r.data.deliverables.slice(0, 20)) {
@@ -130,5 +137,5 @@ export function proposalToForm(x: ContractExtraction | null) {
 export function label(k: string) {
   return ({ title: 'title', campaign: 'campaign', contactName: 'brand contact', contactEmail: 'brand contact email', brandName: 'brand', fee: 'fee', paymentTerms: 'payment terms', signedOn: 'signed date', usageRights: 'usage rights', usageDays: 'usage length',
     usageStartsOn: 'usage start', usageEndsOn: 'usage end', exclusivity: 'exclusivity', exclusivityDays: 'exclusivity length', exclusivityStartsOn: 'exclusivity start',
-    exclusivityEndsOn: 'exclusivity end', whitelisting: 'whitelisting', revisions: 'revisions', killFee: 'kill fee', otherTerms: 'other terms' } as Record<string, string>)[k] ?? k;
+    exclusivityEndsOn: 'exclusivity end', whitelisting: 'whitelisting', revisions: 'revisions', approval: 'review timing', killFee: 'kill fee', otherTerms: 'other terms' } as Record<string, string>)[k] ?? k;
 }

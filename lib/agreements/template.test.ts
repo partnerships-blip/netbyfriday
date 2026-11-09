@@ -102,3 +102,26 @@ describe('fees with more than one amount', () => {
     expect(extractionToTerms(one, { creatorName: 'Poca', creatorEmail: '' }).fee).toBe('6000.00');
   });
 });
+
+describe('rights and terms agreed across several messages', () => {
+  it('keeps a field whose value or quote comes back as a list, and fills review timing', async () => {
+    const { parseExtraction } = await import('../ai/contracts');
+    const thread = "I'm happy to include organic reposting rights across your owned social media platforms. For website usage, I'm also open to allowing select approved content. The rates I originally provided were already based on a non-exclusive partnership. Paid usage is not included in the current partnership rate.";
+    const x = parseExtraction(JSON.stringify({
+      fields: {
+        usageRights: { value: ['Organic reposting on owned social channels', 'Select approved content on the website'], quote: ["I'm happy to include organic reposting rights across your owned social media platforms", "For website usage, I'm also open to allowing select approved content"] },
+        exclusivity: { value: 'None (non-exclusive)', quote: 'The rates I originally provided were already based on a non-exclusive partnership' },
+        whitelisting: { value: 'Not included', quote: ['Paid usage is not included in the current partnership rate'] },
+        approval: { value: 'Brand reviews drafts within 2 business days', quote: null }
+      },
+      deliverables: [{ name: '2 Instagram Reels (November)' }]
+    }), 'text', thread);
+    expect(x.fields.usageRights).toMatchObject({ value: 'Organic reposting on owned social channels; Select approved content on the website', found: true });
+    expect(x.fields.usageRights!.quote).toContain(' … ');
+    expect(x.fields.exclusivity?.value).toBe('None (non-exclusive)');
+    expect(x.fields.whitelisting).toMatchObject({ value: 'Not included', found: true });
+    const t = extractionToTerms(x, { creatorName: 'Casey', creatorEmail: '' });
+    expect([t.usageRights, t.exclusivity, t.whitelisting, t.approval].every(Boolean)).toBe(true);
+    expect(t.approval).toBe('Brand reviews drafts within 2 business days');
+  });
+});

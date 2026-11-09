@@ -99,7 +99,7 @@ export interface ContractExtraction {
   /** Clauses that commonly hurt creators: fixed rules + AI, explained from lib/contracts/redflags.ts. */
   flags?: import('./contracts/redflags').RedFlag[];
   fields: Partial<Record<'title' | 'campaign' | 'contactName' | 'contactEmail' | 'brandName' | 'fee' | 'paymentTerms' | 'signedOn' | 'usageRights' | 'usageDays' | 'usageStartsOn' | 'usageEndsOn'
-    | 'exclusivity' | 'exclusivityDays' | 'exclusivityStartsOn' | 'exclusivityEndsOn' | 'whitelisting' | 'revisions' | 'killFee' | 'otherTerms', ExtractedField>>;
+    | 'exclusivity' | 'exclusivityDays' | 'exclusivityStartsOn' | 'exclusivityEndsOn' | 'whitelisting' | 'revisions' | 'approval' | 'killFee' | 'otherTerms', ExtractedField>>;
   deliverables: { name: string; dueOn: string | null; quote: string; found?: boolean }[];
   warnings: string[];
 }

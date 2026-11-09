@@ -21,6 +21,6 @@ export function extractionToTerms(x: ContractExtraction | null, ctx: { creatorNa
     deliverables: (x?.deliverables ?? []).map(d => ({ name: d.name, dueOn: d.dueOn ?? '' })),
     usageRights: v('usageRights'), usageDays: v('usageDays'),
     exclusivity: v('exclusivity'), exclusivityDays: v('exclusivityDays'),
-    whitelisting: v('whitelisting'), revisions: v('revisions'), killFee: v('killFee'), otherTerms: v('otherTerms')
+    whitelisting: v('whitelisting'), revisions: v('revisions'), approval: v('approval'), killFee: v('killFee'), otherTerms: v('otherTerms')
   };
 }

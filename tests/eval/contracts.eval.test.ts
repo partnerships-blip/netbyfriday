@@ -13,7 +13,7 @@ import { extractionToTerms } from '@/lib/agreements/terms';
 import type { ContractExtraction } from '@/lib/types';
 
 const fx = (...p: string[]) => fs.readFileSync(path.join(__dirname, ...p), 'utf8');
-type Read = { x: ContractExtraction; flags: string[]; fee: string; brand: string; email: string; deliverables: { name: string; dueOn: string }[]; stop: string | null };
+type Read = { x: ContractExtraction; flags: string[]; rights?: { usage: string; exclusivity: string; paid: string; other: string }; fee: string; brand: string; email: string; deliverables: { name: string; dueOn: string }[]; stop: string | null };
 type Check = { name: string; hard?: boolean; ok: (r: Read) => boolean };
 type Case = { name: string; kind: 'message' | 'contract'; text: string; checks: Check[] };
 
@@ -32,7 +32,14 @@ const CASES: Case[] = [
     { name: 'no YouTube deliverable (it was removed)', hard: true, ok: r => !has(/youtube/i)(r) },
     { name: 'Reels listed', ok: has(/reel/i) }, { name: 'Stories listed', ok: has(/stor/i) },
     { name: 'split by month (November / December)', ok: r => has(/nov/i)(r) && has(/dec/i)(r) },
-    { name: 'brand is Golden Strand', ok: r => /golden strand/i.test(r.brand) }, quotesFound] },
+    { name: 'brand is Golden Strand', ok: r => /golden strand/i.test(r.brand) },
+    { name: 'usage rights filled, including the website', ok: r => /website/i.test(r.rights?.usage ?? '') },
+    { name: 'usage rights filled, including organic social reposting', ok: r => /(organic|repost)/i.test(r.rights?.usage ?? '') },
+    { name: 'exclusivity says non-exclusive / none', ok: r => /(non-?exclusive|none)/i.test(r.rights?.exclusivity ?? '') },
+    { name: 'paid ads marked not included', ok: r => /not included|excluded|no paid/i.test(r.rights?.paid ?? '') },
+    { name: 'other terms mention Collab posts', ok: r => /collab/i.test(r.rights?.other ?? '') || r.deliverables.some(d => /collab/i.test(d.name)) },
+    { name: 'rights not all left empty (regression: usage, exclusivity and paid ads all blank)', hard: true, ok: r => [r.rights?.usage, r.rights?.exclusivity, r.rights?.paid].filter(Boolean).length >= 2 },
+    quotesFound] },
   { name: 'Monthly rate, no total (generator)', kind: 'message', text: fx('fixtures', 'rate-only.txt'), checks: [
     fee('', true), { name: 'TikTok listed', ok: has(/tiktok/i) }, { name: 'Stories listed', ok: has(/stor/i) }, { name: 'brand is Northfield Outdoor', ok: r => /northfield/i.test(r.brand) }] },
   { name: 'Instructions hidden in the message (generator)', kind: 'message', text: fx('fixtures', 'injection.txt'), checks: [
@@ -58,11 +65,11 @@ const CASES: Case[] = [
 
 async function read(c: Case): Promise<Read> {
   const msg = c.kind === 'message';
-  const out = await getProvider().readDocument({ system: msg ? AGREEMENT_SYSTEM : CONTRACT_SYSTEM, instruction: msg ? AGREEMENT_INSTRUCTION : CONTRACT_INSTRUCTION, text: c.text, maxTokens: msg ? 4000 : 3000 });
+  const out = await getProvider().readDocument({ system: msg ? AGREEMENT_SYSTEM : CONTRACT_SYSTEM, instruction: msg ? AGREEMENT_INSTRUCTION : CONTRACT_INSTRUCTION, text: c.text, maxTokens: msg ? 8000 : 6000 });
   const x = parseExtraction(out.text, 'text', c.text);
   if (msg) {
     const t = extractionToTerms(x, { creatorName: 'Eval Creator', creatorEmail: '' });
-    return { x, flags: (x.flags ?? []).map(f => f.id), fee: t.fee, brand: t.brandName, email: t.brandSignerEmail, deliverables: t.deliverables, stop: out.stopReason };
+    return { x, flags: (x.flags ?? []).map(f => f.id), rights: { usage: t.usageRights, exclusivity: t.exclusivity, paid: t.whitelisting, other: t.otherTerms }, fee: t.fee, brand: t.brandName, email: t.brandSignerEmail, deliverables: t.deliverables, stop: out.stopReason };
   }
   const f = proposalToForm(x);
   return { x, flags: (x.flags ?? []).map(f => f.id), fee: f.fee, brand: f.brandName, email: x.fields.contactEmail?.value ?? '', deliverables: x.deliverables.map(d => ({ name: d.name, dueOn: d.dueOn ?? '' })), stop: out.stopReason };
