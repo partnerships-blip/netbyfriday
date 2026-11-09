@@ -28,7 +28,7 @@ export function RedFlags({ flags, context = 'contract' }: { flags: RedFlag[]; co
                     <span className="block border-l-[3px] border-line2 pl-2.5 italic text-sub">“{f.quote}”{f.found === undefined ? ' (from the PDF)' : ''}</span>
                     {info ? (<>
                       <p><b>What it means:</b> {info.means}</p>
-                      <p><b>How creators get burned:</b> {info.burn}</p>
+                      <p><b>What can go wrong:</b> {info.burn}</p>
                       <p><b>What to ask for:</b> {info.ask}</p>
                     </>) : <p><b>Why it’s flagged (AI note):</b> {f.aiNote}</p>}
                   </div>
