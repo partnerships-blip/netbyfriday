@@ -8,6 +8,8 @@ import { useAction, toast } from '@/components/Toaster';
 import { saveAgreement, sendAgreement, voidAgreement, deleteAgreement, linkAgreement } from '@/app/(app)/actions';
 import { EMPTY_TERMS, renderAgreement, parseAgreementText, missingRequired, suggestions, type AgreementTerms } from '@/lib/agreements/template';
 import type { Agreement } from '@/lib/types';
+import { RedFlags } from '@/components/RedFlags';
+import { mergeFlags, scanTerms } from '@/lib/contracts/redflags';
 
 const STATUS: Record<Agreement['status'], { label: string; tone: 'neutral' | 'warn' | 'ok' | 'accent' }> = {
   draft: { label: 'Draft', tone: 'neutral' }, sent: { label: 'Waiting for the brand to sign', tone: 'warn' }, signed: { label: 'Signed by both', tone: 'ok' }, void: { label: 'Void', tone: 'neutral' }
@@ -67,6 +69,7 @@ export function AgreementEditor({ agreement: a, deals, readOnly }: { agreement: 
       <div className={cx('grid gap-5', draft && 'lg:grid-cols-[minmax(0,440px)_minmax(0,1fr)]')}>
         {draft && (
           <div className="flex flex-col gap-4">
+            <RedFlags context="message" flags={mergeFlags(ex?.flags, scanTerms({ paymentTerms: t.paymentTerms, usageRights: t.usageRights, exclusivity: t.exclusivity, killFee: t.killFee, otherTerms: t.otherTerms }))} />
             {ex?.warnings?.length ? <div className="flex flex-col gap-1 rounded-[12px] border border-[#E8D9A8] bg-[#FBF6E6] p-3.5 text-[13px] text-[#5C4410]">{ex.warnings.map((w, i) => <span key={i}>• {w}</span>)}</div> : null}
             <Card className="flex flex-col gap-3 p-5">
               <Eyebrow>Parties</Eyebrow>

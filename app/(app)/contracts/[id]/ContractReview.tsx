@@ -6,6 +6,8 @@ import { toast } from '@/components/Toaster';
 import { saveContract, deleteContract } from '@/app/(app)/actions';
 import { addDays, formatCents, parseMoneyToCents, shortDate } from '@/lib/finance/core.js';
 import type { Contract, ExtractedField } from '@/lib/types';
+import { RedFlags, TermHelp } from '@/components/RedFlags';
+import { mergeFlags, scanTerms, TERM_HELP } from '@/lib/contracts/redflags';
 
 type Deal = { id: string; label: string; brandName: string; feeCents: number };
 const cents = (n: number | null) => (n === null ? '' : (n / 100).toFixed(2));
@@ -64,8 +66,11 @@ export function ContractReview({ contract: c, deals, readOnly, today, demo }: { 
 
   // A render helper (not a component), so inputs keep focus while typing.
   const F = ({ k, label, children, wide }: { k?: string; label: string; children: ReactNode; wide?: boolean }) => (
-    <div className={cx('flex flex-col gap-1.5', wide && 'md:col-span-2')}><Field label={label}>{children}</Field><Source f={k ? (x?.fields as any)?.[k] : undefined} /></div>
+    <div className={cx('flex flex-col gap-1.5', wide && 'md:col-span-2')}><Field label={label}>{children}</Field><TermHelp text={k ? TERM_HELP[k] : undefined} /><Source f={k ? (x?.fields as any)?.[k] : undefined} /></div>
   );
+
+  // Red flags from the read, plus the fixed rules over the terms as they stand now (catches edits and older contracts).
+  const flags = useMemo(() => mergeFlags(x?.flags, scanTerms({ paymentTerms: v.paymentTerms, usageRights: v.usageRights, whitelisting: v.whitelisting, exclusivity: v.exclusivity, revisions: v.revisions, killFee: v.killFee, otherTerms: v.otherTerms })), [x, v]);
 
   const summary = useMemo(() => [
     v.brandName && `Brand: ${v.brandName}`, feeCents !== null && `Fee: ${formatCents(feeCents)}`,
@@ -89,6 +94,8 @@ export function ContractReview({ contract: c, deals, readOnly, today, demo }: { 
             {x.warnings.map((w, i) => <span key={i}>• {w}</span>)}
           </div>
         )}
+
+        <RedFlags flags={flags} />
 
         <Card className="grid gap-4 p-5 md:grid-cols-2">
           <h2 className="font-head text-[24px] md:col-span-2">Deal</h2>

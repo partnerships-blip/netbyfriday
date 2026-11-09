@@ -36,3 +36,12 @@ Migration `20261107000001_contracts_taxes_invoice_links.sql`:
 
 - **App-sent email.** It needs an email service (for example Resend) and SPF/DKIM records on netbyfriday.com. Both are on the "don't build" list in `CLAUDE.md` today.
 - **Word (.docx) contracts.** They need a document parser dependency. Today the app asks creators to save as PDF.
+
+## Red flags and plain-English terms (2026-11-08)
+
+Contract review and the contract generator show a **Red flags** card: the clauses creators most often get burned by, each with the contract's own wording, what it means, how creators get burned, and what to ask for. High-risk items open automatically.
+
+- **Fixed rules first** (`lib/contracts/redflags.ts`): in perpetuity / no end date, irrevocable, giving up ownership (work for hire, assignment), AI training and digital replicas, likeness, worldwide, brand edits, pay-when-paid, pay tied to views or sales, Net 46+ days, payment on approval or campaign end, refunds and clawbacks, cancel for any reason, indemnity, broad exclusivity, paid ads and whitelisting, unlimited revisions, sole discretion, auto-renewal, morality clauses, posts that can never come down, arbitration. They run on the pasted text, on the AI's quotes for PDFs, and again on the terms as the creator edits them (so older contracts get flags too).
+- **The AI adds reworded clauses** ("for as long as Brand determines"). Each AI flag must quote wording that's actually in the text; the explanation always comes from our fixed list, never from the model (except "other", labeled as an AI note).
+- **"What's this?"** next to each term explains it in plain English (`TERM_HELP`).
+- Not legal advice; the card says so. Tests: `lib/contracts/redflags.test.ts`, `tests/e2e/red-flags.spec.ts`, and two red-flag cases in the Contracts evaluation (`docs/AI_EVALS.md`).

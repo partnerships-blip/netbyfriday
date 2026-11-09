@@ -5,7 +5,7 @@ Two checks run the real AI model and fail if it gets worse. Neither uses real cr
 | Workflow | What it checks | When it runs | Bar |
 |---|---|---|---|
 | **Advisor evaluation** (`advisor-eval.yml`) | 20 Advisor questions on the demo workspace, through staging | By hand, after any Advisor prompt or model change | 0 wrong numbers marked Verified, ≥ 18/20 |
-| **Contracts evaluation** (`contracts-eval.yml`) | Contract reading and the contract generator on 7 fictional messages and contracts | By hand, and automatically when the prompts or term-handling code change | 0 hard failures, ≥ 80% of soft checks |
+| **Contracts evaluation** (`contracts-eval.yml`) | Contract reading and the contract generator on 9 fictional messages and contracts (including red flags) | By hand, and automatically when the prompts or term-handling code change | 0 hard failures, ≥ 80% of soft checks |
 
 ## Contracts evaluation
 
@@ -27,7 +27,7 @@ GitHub → the netbyfriday repository → Settings → Secrets and variables →
 
 Then go to Actions → Contracts evaluation → Run workflow. The results table appears in the run summary.
 
-Each run makes 7 short AI calls. Without the secrets, automatic runs skip with a notice, and manual runs fail with a message saying what to add.
+Each run makes 9 short AI calls. Without the secrets, automatic runs skip with a notice, and manual runs fail with a message saying what to add.
 
 ### Locally
 

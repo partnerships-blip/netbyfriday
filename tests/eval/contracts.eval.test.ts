@@ -13,7 +13,7 @@ import { extractionToTerms } from '@/lib/agreements/terms';
 import type { ContractExtraction } from '@/lib/types';
 
 const fx = (...p: string[]) => fs.readFileSync(path.join(__dirname, ...p), 'utf8');
-type Read = { x: ContractExtraction; fee: string; brand: string; email: string; deliverables: { name: string; dueOn: string }[]; stop: string | null };
+type Read = { x: ContractExtraction; flags: string[]; fee: string; brand: string; email: string; deliverables: { name: string; dueOn: string }[]; stop: string | null };
 type Check = { name: string; hard?: boolean; ok: (r: Read) => boolean };
 type Case = { name: string; kind: 'message' | 'contract'; text: string; checks: Check[] };
 
@@ -42,6 +42,16 @@ const CASES: Case[] = [
     fee('', true), { name: 'a warning says the fee is not settled', ok: r => r.x.warnings.some(w => /fee|budget|price|rate|negotiat|settled|agreed/i.test(w)) }] },
   { name: 'Uploaded contract (reader)', kind: 'contract', text: fx('..', 'e2e', 'fixtures', 'sample-contract.txt'), checks: [
     fee('6500.00'), { name: 'brand is Marigold Beauty Co.', ok: r => /marigold/i.test(r.brand) }, { name: '3 deliverables', ok: r => r.deliverables.length === 3 }, quotesFound] },
+  { name: 'Risky clauses, all reworded (reader red flags)', kind: 'contract', text: fx('fixtures', 'reworded-risky-contract.txt'), checks: [
+    fee('2800.00'),
+    { name: 'flags usage with no end date (“for as long as Brand determines”)', ok: r => r.flags.includes('perpetual') },
+    { name: 'flags pay-when-paid (“once Agency has itself been paid”)', ok: r => r.flags.includes('payWhenPaid') },
+    { name: 'flags giving up ownership (“exclusive property of Brand upon creation”)', ok: r => r.flags.includes('ownership') },
+    { name: 'flags paying money back (“return all compensation”)', ok: r => r.flags.includes('clawback') || r.flags.includes('performancePay') },
+    { name: 'flags unlimited revision rounds', ok: r => r.flags.includes('unlimitedRevisions') },
+    { name: 'catches at least 3 of these 5 traps', hard: true, ok: r => ['perpetual', 'payWhenPaid', 'ownership', 'clawback', 'unlimitedRevisions'].filter(id => r.flags.includes(id) || (id === 'clawback' && r.flags.includes('performancePay'))).length >= 3 }] },
+  { name: 'A fair contract raises no high-risk alarms (reader red flags)', kind: 'contract', text: fx('fixtures', 'per-deliverable-contract.txt'), checks: [
+    { name: 'no high-risk red flags on a fair contract', hard: true, ok: r => !(r.x.flags ?? []).some(f => f.severity === 'high') }] },
   { name: 'Per-Reel price with a written total (reader)', kind: 'contract', text: fx('fixtures', 'per-deliverable-contract.txt'), checks: [
     fee('3600.00'), { name: '3 Reels with dates', ok: r => r.deliverables.filter(d => d.dueOn).length === 3 || (r.deliverables.length === 1 && /3/.test(r.deliverables[0].name)) }, quotesFound] }
 ];
@@ -52,10 +62,10 @@ async function read(c: Case): Promise<Read> {
   const x = parseExtraction(out.text, 'text', c.text);
   if (msg) {
     const t = extractionToTerms(x, { creatorName: 'Eval Creator', creatorEmail: '' });
-    return { x, fee: t.fee, brand: t.brandName, email: t.brandSignerEmail, deliverables: t.deliverables, stop: out.stopReason };
+    return { x, flags: (x.flags ?? []).map(f => f.id), fee: t.fee, brand: t.brandName, email: t.brandSignerEmail, deliverables: t.deliverables, stop: out.stopReason };
   }
   const f = proposalToForm(x);
-  return { x, fee: f.fee, brand: f.brandName, email: x.fields.contactEmail?.value ?? '', deliverables: x.deliverables.map(d => ({ name: d.name, dueOn: d.dueOn ?? '' })), stop: out.stopReason };
+  return { x, flags: (x.flags ?? []).map(f => f.id), fee: f.fee, brand: f.brandName, email: x.fields.contactEmail?.value ?? '', deliverables: x.deliverables.map(d => ({ name: d.name, dueOn: d.dueOn ?? '' })), stop: out.stopReason };
 }
 
 const live = process.env.E2E_REAL_AI === '1';
@@ -68,7 +78,7 @@ describe.skipIf(!live)('contract reading + generator evaluation (real AI)', () =
       try { r = await read(c); } catch (e) { err = (e as Error).message; }
       lines.push(`## ${c.name}`);
       if (!r) { hardFails++; lines.push(`- ❌ **HARD** the read failed: ${err}`, ''); continue; }
-      lines.push(`- Read: fee \`${r.fee || '(empty)'}\` · brand \`${r.brand || '(empty)'}\` · ${r.deliverables.length} deliverables: ${r.deliverables.map(d => `${d.name}${d.dueOn ? ` (${d.dueOn})` : ''}`).join('; ') || '—'}${r.stop === 'max_tokens' ? ' · ⚠️ cut off' : ''}`);
+      lines.push(`- Read: fee \`${r.fee || '(empty)'}\` · brand \`${r.brand || '(empty)'}\` · ${r.deliverables.length} deliverables: ${r.deliverables.map(d => `${d.name}${d.dueOn ? ` (${d.dueOn})` : ''}`).join('; ') || '—'}${r.stop === 'max_tokens' ? ' · ⚠️ cut off' : ''}${r.flags.length ? ` · red flags: ${r.flags.join(', ')}` : ''}`);
       for (const ch of c.checks) {
         const ok = ch.ok(r);
         if (ch.hard) { if (!ok) hardFails++; } else { soft++; if (ok) softPass++; }

@@ -96,6 +96,8 @@ export interface Agreement {
 export interface ExtractedField { value: string; quote: string; found?: boolean }
 export interface ContractExtraction {
   source: 'pdf' | 'text' | 'image';
+  /** Clauses that commonly hurt creators: fixed rules + AI, explained from lib/contracts/redflags.ts. */
+  flags?: import('./contracts/redflags').RedFlag[];
   fields: Partial<Record<'title' | 'campaign' | 'contactName' | 'contactEmail' | 'brandName' | 'fee' | 'paymentTerms' | 'signedOn' | 'usageRights' | 'usageDays' | 'usageStartsOn' | 'usageEndsOn'
     | 'exclusivity' | 'exclusivityDays' | 'exclusivityStartsOn' | 'exclusivityEndsOn' | 'whitelisting' | 'revisions' | 'killFee' | 'otherTerms', ExtractedField>>;
   deliverables: { name: string; dueOn: string | null; quote: string; found?: boolean }[];
