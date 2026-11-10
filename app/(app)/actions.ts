@@ -16,12 +16,13 @@ import { flag } from '@/lib/flags';
 import { addDays, shortDate, dealOutstanding, formatCents } from '@/lib/finance/core.js';
 
 type Ctx = Awaited<ReturnType<typeof requireWritable>>;
-async function run(fn: (c: Ctx) => Promise<string | void>, message?: string): Promise<ActionResult> {
+async function run(fn: (c: Ctx) => Promise<string | void | { id?: string; message?: string }>, message?: string): Promise<ActionResult> {
   try {
     const c = await requireWritable();
-    const id = await fn(c);
+    const r = await fn(c);
     revalidatePath('/', 'layout');
-    return { ok: true, id: id || undefined, message };
+    if (r && typeof r === 'object') return { ok: true, id: r.id || undefined, message: r.message ?? message };
+    return { ok: true, id: r || undefined, message };
   } catch (e) { return { ok: false, error: friendlyError(e) }; }
 }
 const ok = <T>(r: { data: T; error: any }): NonNullable<T> => { if (r.error) throw r.error; return r.data as NonNullable<T>; };
@@ -479,7 +480,7 @@ export async function linkContract(raw: unknown) {
   return run(async c => {
     if (!flag('contracts')) throw new UserError('Contracts are not available yet.');
     const v = S.ContractLinkSchema.parse(raw);
-    const cur = ok(await c.sb.from('contracts').select('id,status,payment_terms,usage_rights,exclusivity').eq('id', v.contractId).eq('workspace_id', c.ws.id).single());
+    const cur = ok(await c.sb.from('contracts').select('id,status,payment_terms,usage_rights,exclusivity,extracted').eq('id', v.contractId).eq('workspace_id', c.ws.id).single());
     if (v.dealId) {
       const deal = ok(await c.sb.from('deals').select('id,contract_status,usage_rights,exclusivity,payment_terms').eq('id', v.dealId).eq('workspace_id', c.ws.id).single());
       if (cur.status === 'confirmed') {
@@ -492,6 +493,10 @@ export async function linkContract(raw: unknown) {
       }
     }
     ok(await c.sb.from('contracts').update({ deal_id: v.dealId }).eq('id', v.contractId).eq('workspace_id', c.ws.id).select('id').single());
+    if (v.dealId && cur.status === 'confirmed') {
+      const r = await addDeliverablesToDeal(c, v.dealId, ((cur.extracted as { deliverables?: { name?: string; dueOn?: string | null }[] } | null)?.deliverables ?? []));
+      if (r.added || r.undated) return { id: v.contractId, message: `Contract linked.${addedNote(r)}` };
+    }
     return v.contractId;
   }, linking ? 'Contract linked' : 'Contract unlinked');
 }
@@ -522,11 +527,39 @@ export async function saveAgreement(raw: unknown) {
   }, 'Draft saved');
 }
 
+// ---------- deliverables from agreements and contracts reach the partnership (and the content calendar) ----------
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+/** Adds dated deliverables to a partnership, skipping any it already has (same name and date). Undated ones can't go on
+ *  the calendar, so they're counted and the creator adds a date in the partnership. */
+async function addDeliverablesToDeal(c: Ctx, dealId: string, items: { name?: string | null; dueOn?: string | null }[], agreementId: string | null = null) {
+  const clean = items.map(d => ({ name: String(d.name ?? '').trim().slice(0, 200), dueOn: String(d.dueOn ?? '') })).filter(d => d.name);
+  const dated = clean.filter(d => ISO_DAY.test(d.dueOn));
+  const undated = clean.length - dated.length;
+  if (!dated.length) return { added: 0, undated };
+  const existing = ok(await c.sb.from('deliverables').select('name,due_on').eq('workspace_id', c.ws.id).eq('deal_id', dealId)) as { name: string; due_on: string }[];
+  const key = (n: string, d: string) => `${n.toLowerCase()}|${d}`;
+  const have = new Set(existing.map(e => key(e.name, e.due_on)));
+  const rows = [];
+  for (const d of dated) {
+    if (have.has(key(d.name, d.dueOn))) continue;
+    have.add(key(d.name, d.dueOn));
+    rows.push({ workspace_id: c.ws.id, deal_id: dealId, name: d.name, due_on: d.dueOn, agreement_id: agreementId });
+  }
+  if (rows.length) ok(await c.sb.from('deliverables').insert(rows));
+  return { added: rows.length, undated };
+}
+/** Removes an agreement's deliverables that haven't been started (voided, or moved to another partnership). */
+async function removeUnstartedAgreementDeliverables(c: Ctx, agreementId: string) {
+  ok(await c.sb.from('deliverables').delete().eq('workspace_id', c.ws.id).eq('agreement_id', agreementId).eq('status', 'not_started'));
+}
+const addedNote = (r: { added: number; undated: number }) =>
+  `${r.added ? ` Added ${r.added} deliverable${r.added === 1 ? '' : 's'} to the partnership and content calendar.` : ''}${r.undated ? ` ${r.undated} without a date: add dates in the partnership to see them on the calendar.` : ''}`;
+
 export async function sendAgreement(raw: unknown) {
   return run(async c => {
     await agreementCtx(c);
     const v = S.AgreementSendSchema.parse(raw);
-    const cur = ok(await c.sb.from('agreements').select('id,status,terms,audit').eq('id', v.id).eq('workspace_id', c.ws.id).single());
+    const cur = ok(await c.sb.from('agreements').select('id,status,terms,audit,deal_id').eq('id', v.id).eq('workspace_id', c.ws.id).single());
     if (cur.status !== 'draft') throw new UserError('This agreement was already sent.');
     const terms = S.AgreementTermsSchema.parse(cur.terms ?? {});
     const missing = missingRequired(terms);
@@ -539,7 +572,8 @@ export async function sendAgreement(raw: unknown) {
       creator_name: terms.creatorName, creator_email: terms.creatorEmail, creator_signature: v.signature, creator_signed_at: at, creator_ip: ip,
       audit: [...(Array.isArray(cur.audit) ? cur.audit : []), { event: 'consented', at, by: terms.creatorName }, { event: 'creator_signed', at, by: terms.creatorName, ip }, { event: 'link_created', at }]
     }).eq('id', v.id).eq('workspace_id', c.ws.id).select('id').single());
-    return v.id;
+    const r = cur.deal_id ? await addDeliverablesToDeal(c, cur.deal_id, terms.deliverables, v.id) : { added: 0, undated: 0 };
+    return { id: v.id, message: `Signed. Your private link is ready to send.${addedNote(r)}` };
   }, 'Signed. Your private link is ready to send.');
 }
 
@@ -551,7 +585,8 @@ export async function voidAgreement(id: string) {
     if (cur.status !== 'sent') throw new UserError('Only a sent agreement can be voided.');
     ok(await c.sb.from('agreements').update({ status: 'void', share_token: null, voided_at: nowIso(), audit: [...(cur.audit ?? []), { event: 'voided', at: nowIso() }] })
       .eq('id', id).eq('workspace_id', c.ws.id).select('id').single());
-  }, 'Agreement voided. The link no longer works.');
+    await removeUnstartedAgreementDeliverables(c, id);
+  }, 'Agreement voided. The link no longer works, and its deliverables you hadn’t started were removed from the partnership.');
 }
 
 export async function deleteAgreement(id: string) {
@@ -567,7 +602,13 @@ export async function linkAgreement(raw: unknown) {
   return run(async c => {
     await agreementCtx(c);
     const v = S.ContractLinkSchema.parse(raw);
+    const cur = ok(await c.sb.from('agreements').select('id,status,terms,deal_id').eq('id', v.contractId).eq('workspace_id', c.ws.id).single());
     ok(await c.sb.from('agreements').update({ deal_id: v.dealId }).eq('id', v.contractId).eq('workspace_id', c.ws.id).select('id').single());
+    if (cur.deal_id && cur.deal_id !== v.dealId) await removeUnstartedAgreementDeliverables(c, v.contractId);
+    if (v.dealId && (cur.status === 'sent' || cur.status === 'signed')) {
+      const r = await addDeliverablesToDeal(c, v.dealId, S.AgreementTermsSchema.parse(cur.terms ?? {}).deliverables, v.contractId);
+      return { id: v.contractId, message: `Partnership updated.${addedNote(r)}` };
+    }
     return v.contractId;
   }, 'Partnership updated');
 }

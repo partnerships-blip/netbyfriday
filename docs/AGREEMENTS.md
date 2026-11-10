@@ -39,3 +39,14 @@ Migration `20261110000001_agreements.sql`: the `agreements` table with RLS and c
 ## Tests
 
 `lib/agreements/template.test.ts` (template, fallbacks, required terms, round trip, term mapping, validation) and `tests/e2e/agreements.spec.ts` (DM → draft → edit → sign and send → brand signs from the link without an account → can't sign twice → screenshot path). The AI stub reads `tests/e2e/fixtures/sample-deal-dm.txt`.
+
+## Deliverables reach the partnership and the content calendar (2026-11-10)
+
+- **When it happens:** signing and sending an agreement that's linked to a partnership adds its dated deliverables to that partnership, which puts them on the Content page and its calendar. Linking an already sent or signed agreement does the same.
+- **No duplicates:** a deliverable with the same name and date is skipped.
+- **Undated deliverables:** they can't go on a calendar, so they're counted in the message and the creator adds a date in the partnership.
+- **Marking the source:** each added deliverable carries `agreement_id`, a workspace-scoped key.
+- **Void, or move to another partnership:** removes that agreement's deliverables that are still "Not started". Started or finished ones stay.
+- **Confirmed uploaded contracts:** linking one to a partnership later adds its dated deliverables the same way. Confirming into a partnership already did.
+- **Backfill:** migration `20261113000001_deliverables_from_agreements.sql` adds the column and fills in deliverables for sent or signed agreements already linked to a partnership, once and without duplicates.
+- **Tests:** `tests/e2e/agreement-deliverables.spec.ts`, plus `rls_isolation.test.sql` (plan 60).

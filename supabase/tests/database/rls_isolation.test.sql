@@ -2,7 +2,7 @@
 -- Verifies invite gating, workspace isolation, cross-tenant FK protection, and payment guards.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(58);
+select plan(60);
 
 insert into public.invite_codes(code, max_uses) values ('PGTAP-TEST', 5);
 
@@ -179,6 +179,18 @@ select throws_ok(
   $$ select public.sign_agreement('dddddddd-0000-0000-0000-000000000001', '15ef33a8b6567cab1da5eb250445e5ebf3f61b1263e0c1fa037af4db348969f5', 'Dana Brand', '', 'dana@brand.test', 'Dana Brand', true, '1.2.3.4', 'test') $$,
   '23514', 'AGREEMENT_NOT_OPEN', 'a signed agreement cannot be signed again');
 
+-- Deliverables from agreements: the link to an agreement stays inside the workspace.
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}', true);
+insert into public.deals (id, workspace_id, brand_id, campaign) values ('bbbbbbbb-0000-0000-0000-000000000002', (select id from t_ws where owner_id = '22222222-2222-2222-2222-222222222222'), 'bbbbbbbb-0000-0000-0000-000000000001', 'B deal');
+select throws_ok(
+  $$ insert into public.deliverables (workspace_id, deal_id, name, due_on, agreement_id) values ((select id from t_ws where owner_id = '22222222-2222-2222-2222-222222222222'), 'bbbbbbbb-0000-0000-0000-000000000002', 'Reel', '2026-12-01', 'aaaaaaaa-0000-0000-0000-000000000006') $$,
+  '23503', null, 'B cannot tie a deliverable to A''s agreement');
+select lives_ok(
+  $$ insert into public.deliverables (workspace_id, deal_id, name, due_on) values ((select id from t_ws where owner_id = '22222222-2222-2222-2222-222222222222'), 'bbbbbbbb-0000-0000-0000-000000000002', 'Reel', '2026-12-01') $$,
+  'B adds a deliverable to their own partnership');
+reset role;
+
 -- ---------- deleting an account (A has payments and a signed agreement, which the app itself can't delete) ----------
 select throws_ok($$ select public.delete_my_account('a@test.dev') $$, '42501', null, 'anonymous users cannot delete an account');
 set local role authenticated;
@@ -188,7 +200,7 @@ select lives_ok($$ select public.delete_my_account(' A@test.dev ') $$, 'A delete
 reset role;
 select is((select count(*)::int from auth.users where id = '11111111-1111-1111-1111-111111111111'), 0, 'A login is gone');
 select is((select count(*)::int from public.workspaces where owner_id = '11111111-1111-1111-1111-111111111111'), 0, 'A workspace is gone');
-select is((select count(*)::int from public.payments) + (select count(*)::int from public.agreements) + (select count(*)::int from public.deals), 0, 'A payments, agreements and partnerships are gone');
+select is((select count(*)::int from public.payments) + (select count(*)::int from public.agreements) + (select count(*)::int from public.deals where campaign <> 'B deal'), 0, 'A payments, agreements and partnerships are gone');
 select is((select count(*)::int from public.workspaces), 1, 'B workspace is untouched');
 
 select * from finish();
