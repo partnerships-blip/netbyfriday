@@ -189,7 +189,7 @@ select throws_ok(
 select lives_ok(
   $$ insert into public.deliverables (workspace_id, deal_id, name, due_on) values ((select id from t_ws where owner_id = '22222222-2222-2222-2222-222222222222'), 'bbbbbbbb-0000-0000-0000-000000000002', 'Reel', '2026-12-01') $$,
   'B adds a deliverable to their own partnership');
-reset role;
+set local role anon;   -- back to the anonymous visitor the next section starts as
 
 -- ---------- deleting an account (A has payments and a signed agreement, which the app itself can't delete) ----------
 select throws_ok($$ select public.delete_my_account('a@test.dev') $$, '42501', null, 'anonymous users cannot delete an account');
